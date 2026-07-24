@@ -12,7 +12,7 @@ import {
   DEFAULT_MODEL,
 } from "./llm.js";
 
-const APP_VERSION = "0.6.0";
+const APP_VERSION = "0.7.0";
 
 // ---------- date helpers (local time, Honolulu-safe) ----------
 const pad = (n) => String(n).padStart(2, "0");
@@ -445,19 +445,16 @@ function applyReview() {
   }
 }
 
-function manualAdd() {
-  const title = $("manualTitle").value.trim();
-  if (!title) {
-    $("manualTitle").focus();
-    return;
-  }
-  const dateVal = $("manualDate").value;
+// Shared by every manual path: the error box form and the empty-review form.
+function addSingleTask(title, dateVal) {
+  const clean = title.trim();
+  if (!clean) return false;
   const now = new Date().toISOString();
   mutate([
     ...tasks,
     {
       id: uid(),
-      title,
+      title: clean.length > 80 ? clean.slice(0, 77) + "..." : clean,
       project: null,
       notes: "",
       due: isDateStr(dateVal) ? dateVal : addDays(todayStr(), 1),
@@ -473,6 +470,13 @@ function manualAdd() {
   makeBtn.disabled = true;
   say("Added 1 task");
   track("tasks_added", { count: 1, method: "manual" });
+  return true;
+}
+
+function manualAdd() {
+  if (!addSingleTask($("manualTitle").value, $("manualDate").value)) {
+    $("manualTitle").focus();
+  }
 }
 
 // ---------- task actions ----------
@@ -596,6 +600,9 @@ async function importData(e) {
       return;
     }
     mutate([...next, ...brandNew]);
+    // Land the user on their list so the imported tasks are visible, with
+    // the toast carrying the counts.
+    if (openPanel) setPanel(openPanel);
     const parts = [];
     if (brandNew.length) parts.push(`Imported ${brandNew.length}`);
     if (updated) parts.push(`updated ${updated}`);
@@ -796,6 +803,11 @@ function taskRow(t) {
   return row;
 }
 
+// Which date sections the user has opened or closed by hand this session.
+// Without an override, only the topmost section starts open (Late when
+// anything is late, otherwise Today, and so on), keeping the list calm.
+let bucketToggles = {};
+
 function renderList() {
   bucketsEl.innerHTML = "";
   const vis = visibleTasks();
@@ -816,15 +828,21 @@ function renderList() {
     emptyMsg.hidden = true;
   }
 
-  makeBuckets().forEach((b) => {
+  makeBuckets().forEach((b, i) => {
+    const open = bucketToggles[b.label] !== undefined ? bucketToggles[b.label] : i === 0;
     const wrap = el("div", "bucket");
     const head = el(
-      "div",
+      "button",
       "bucket-head" + (b.label === "Late" ? " late" : ""),
-      `${b.label} · ${b.items.length}`
+      `${open ? "▾" : "▸"} ${b.label} · ${b.items.length}`
     );
+    head.setAttribute("aria-expanded", String(open));
+    head.addEventListener("click", () => {
+      bucketToggles[b.label] = !open;
+      renderList();
+    });
     wrap.appendChild(head);
-    b.items.forEach((t) => wrap.appendChild(taskRow(t)));
+    if (open) b.items.forEach((t) => wrap.appendChild(taskRow(t)));
     bucketsEl.appendChild(wrap);
   });
 }
@@ -876,15 +894,49 @@ function renderReview() {
   reviewTray.innerHTML = "";
 
   if (review.news.length === 0 && review.updates.length === 0) {
-    const box = el("div", "review-empty");
-    box.appendChild(el("span", null, "No clear tasks in that. Nothing was added."));
-    const ok = el("button", "subtle-btn", "OK");
-    ok.addEventListener("click", () => {
+    // The model came up empty, so hand the user the pen: same manual form
+    // as the error path, prefilled from what they typed.
+    reviewTray.appendChild(
+      el("div", "review-head", "No clear tasks found. Add it yourself:")
+    );
+    const row = el("div", "review-meta");
+    const title = el("input", "review-title");
+    const text = pool.value.trim();
+    title.value = text.length > 80 ? text.slice(0, 77) + "..." : text;
+    title.setAttribute("aria-label", "Task title");
+    const date = el("input", "review-date");
+    date.type = "date";
+    date.value = addDays(todayStr(), 1);
+    date.setAttribute("aria-label", "Due date");
+    const add = el("button", "primary-btn", "Add task");
+    const dismiss = el("button", "subtle-btn", "Dismiss");
+    const doAdd = () => {
+      if (addSingleTask(title.value, date.value)) {
+        review = null;
+        renderReview();
+      } else {
+        title.focus();
+      }
+    };
+    add.addEventListener("click", doAdd);
+    [title, date].forEach((inp) =>
+      inp.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          doAdd();
+        }
+      })
+    );
+    dismiss.addEventListener("click", () => {
       review = null;
       renderReview();
     });
-    box.appendChild(ok);
-    reviewTray.appendChild(box);
+    row.appendChild(title);
+    row.appendChild(date);
+    row.appendChild(add);
+    row.appendChild(dismiss);
+    reviewTray.appendChild(row);
+    setTimeout(() => add.focus({ preventScroll: true }), 0);
     return;
   }
 
@@ -1054,6 +1106,8 @@ const panels = {
 };
 let openPanel = null;
 
+const PANEL_LABELS = { models: "models", help: "help", privacy: "privacy/export" };
+
 function setPanel(name) {
   openPanel = openPanel === name ? null : name;
   if (openPanel === "models") renderModelsPage();
@@ -1061,7 +1115,7 @@ function setPanel(name) {
     const on = openPanel === key;
     panel.hidden = !on;
     link.classList.toggle("on", on);
-    link.textContent = on ? "back to tasks" : key;
+    link.textContent = on ? "back to tasks" : PANEL_LABELS[key];
   });
   $("mainView").hidden = openPanel !== null;
   $("footTag").hidden = openPanel !== null;

@@ -485,6 +485,13 @@ button { font-family: var(--sans); }
   margin-top: 5px;
 }
 
+/* in the empty-result manual form the title shares the row */
+.review-meta .review-title {
+  width: auto;
+  flex: 1;
+  min-width: 200px;
+}
+
 .review-date {
   font-family: var(--mono);
   font-size: 11.5px;
@@ -663,11 +670,17 @@ button { font-family: var(--sans); }
 .bucket { margin-top: 22px; }
 
 .bucket-head {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
   font-size: 11px;
   letter-spacing: 0.09em;
   text-transform: uppercase;
   color: var(--sub);
-  padding-bottom: 6px;
+  padding: 0 0 6px;
   border-bottom: 1px solid var(--line);
 }
 .bucket-head.late {

@@ -57,6 +57,44 @@ button { font-family: var(--sans); }
   padding: 0 16px 96px;
 }
 
+/* Wide screens: tasks live on the left, capture on the right. The capture
+   column stays put while the task list scrolls, so adding and scanning
+   never fight each other. Small screens keep the single column above. */
+@media (min-width: 1024px) {
+  .wrap {
+    max-width: 1200px;
+    padding-left: 32px;
+    padding-right: 32px;
+  }
+
+  #mainView {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 440px;
+    gap: 56px;
+    align-items: start;
+  }
+
+  #captureCol {
+    grid-column: 2;
+    grid-row: 1;
+    position: sticky;
+    top: 28px;
+  }
+
+  #tasksCol {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  #tasksCol .tabs { margin-top: 0; }
+
+  /* reading pages stay a comfortable measure, not full width */
+  .panel {
+    max-width: 720px;
+    margin: 0 auto;
+  }
+}
+
 /* ---------- header ---------- */
 .header {
   display: flex;

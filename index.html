@@ -155,8 +155,10 @@
       review. Escape closes this page, the privacy page, or a review.</p>
     </section>
 
-    <!-- main app -->
+    <!-- main app: one column on small screens, capture right + tasks left
+         on large ones -->
     <main id="mainView">
+      <div id="captureCol">
       <!-- the pool -->
       <div class="pool">
         <textarea id="pool" rows="3"
@@ -196,7 +198,9 @@
 
       <!-- review tray -->
       <div id="reviewTray" class="review-tray" hidden></div>
+      </div>
 
+      <div id="tasksCol">
       <!-- tabs -->
       <div class="tabs" role="tablist" aria-label="Task lists">
         <button id="tabActive" class="tab" role="tab" aria-selected="true">Active · 0</button>
@@ -219,6 +223,7 @@
           <button id="pauClear" class="pau-clear" hidden>Clear all</button>
         </div>
         <div id="pauList"></div>
+      </div>
       </div>
     </main>
 

@@ -12,7 +12,7 @@ import {
   DEFAULT_MODEL,
 } from "./llm.js";
 
-const APP_VERSION = "0.5.0";
+const APP_VERSION = "0.5.1";
 
 // ---------- date helpers (local time, Honolulu-safe) ----------
 const pad = (n) => String(n).padStart(2, "0");

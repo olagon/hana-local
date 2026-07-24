@@ -34,15 +34,14 @@ const localAppConfig = () => {
 // prebuilt list; pickerModels() filters just in case a bundle drops one.
 const MODEL_CHOICES = [
   {
-    id: LOCAL_MODEL_ID,
-    label: "Qwen2.5 3B · 1.7 GB · included, no download",
-    note: "The default. Ships with the app, nothing to download. Needs a reasonably recent computer.",
+    id: "Llama-3.1-8B-Instruct-q4f16_1-MLC",
+    label: "Llama 3.1 8B · 4.6 GB · sharpest, fast computers",
+    note: "The biggest option. Best comprehension; wants a strong GPU and 16 GB+ of memory.",
     summary:
-      "The default, and the one that ships with the app. It never downloads anything. " +
-      "Alibaba's Qwen2.5 at 3 billion parameters is the sweet spot for this job: it reads " +
-      "everyday email and notes well, follows the date rules, and runs comfortably on any " +
-      "reasonably recent laptop with about 3 GB of memory to spare. Start here, and only " +
-      "switch if you have a reason to.",
+      "The biggest option here. Meta's Llama 3.1 at 8 billion parameters has the best " +
+      "comprehension of the lot, the one to try if the others keep misreading you. Same " +
+      "hardware appetite as the 7B (strong GPU, 16 GB+ of memory) and the slowest per " +
+      "read. A one-time 4.6 GB download.",
   },
   {
     id: "Qwen2.5-7B-Instruct-q4f16_1-MLC",
@@ -55,16 +54,6 @@ const MODEL_CHOICES = [
       "read. A one-time 4.4 GB download.",
   },
   {
-    id: "Llama-3.1-8B-Instruct-q4f16_1-MLC",
-    label: "Llama 3.1 8B · 4.6 GB · sharpest, fast computers",
-    note: "The biggest option. Best comprehension; wants a strong GPU and 16 GB+ of memory.",
-    summary:
-      "The biggest option here. Meta's Llama 3.1 at 8 billion parameters has the best " +
-      "comprehension of the lot, the one to try if the others keep misreading you. Same " +
-      "hardware appetite as the 7B (strong GPU, 16 GB+ of memory) and the slowest per " +
-      "read. A one-time 4.6 GB download.",
-  },
-  {
     id: "Llama-3.2-3B-Instruct-q4f16_1-MLC",
     label: "Llama 3.2 3B · 1.8 GB · strong alternative",
     note: "A solid alternative 3B if Qwen gives your device trouble.",
@@ -72,6 +61,17 @@ const MODEL_CHOICES = [
       "Meta's 3-billion-parameter model, the same weight class as the default with a " +
       "different personality. Worth a try if the default keeps making the same mistake on " +
       "your writing style. Otherwise they're close. A one-time 1.8 GB download.",
+  },
+  {
+    id: LOCAL_MODEL_ID,
+    label: "Qwen2.5 3B · 1.7 GB · included, no download",
+    note: "The default. Ships with the app, nothing to download. Needs a reasonably recent computer.",
+    summary:
+      "The default, and the one that ships with the app. It never downloads anything. " +
+      "Alibaba's Qwen2.5 at 3 billion parameters is the sweet spot for this job: it reads " +
+      "everyday email and notes well, follows the date rules, and runs comfortably on any " +
+      "reasonably recent laptop with about 3 GB of memory to spare. Start here, and only " +
+      "switch if you have a reason to.",
   },
   {
     id: "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
@@ -105,7 +105,7 @@ const MODEL_CHOICES = [
   },
 ];
 
-export const DEFAULT_MODEL = MODEL_CHOICES[0].id;
+export const DEFAULT_MODEL = LOCAL_MODEL_ID;
 
 export function pickerModels() {
   const known = new Set(prebuiltAppConfig.model_list.map((m) => m.model_id));

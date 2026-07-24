@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>hana-local · private task manager</title>
+<meta name="description" content="A fully private task manager. The AI runs on your device. Your words never leave it." />
+<meta name="theme-color" content="#EFF3EC" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icon.svg" type="image/svg+xml" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<link rel="stylesheet" href="fonts/fonts.css" />
+<link rel="stylesheet" href="styles.css" />
+<!-- Google Analytics: usage counts only. Task text never goes anywhere.
+     Offline or blocked, the app works identically. -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-6RWQDJYE9C"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag() { dataLayer.push(arguments); }
+  gtag("js", new Date());
+  gtag("config", "G-6RWQDJYE9C");
+</script>
+</head>
+<body>
+  <datalist id="hana-projects"></datalist>
+  <input id="importFile" type="file" accept=".json,application/json" hidden />
+
+  <div class="wrap">
+    <!-- header -->
+    <header class="header">
+      <h1 class="wordmark">hana<span class="wordmark-local">local</span></h1>
+      <nav class="header-links" aria-label="Pages">
+        <button id="navModels" class="navlink">models</button>
+        <button id="navPrivacy" class="navlink">privacy</button>
+        <button id="navHelp" class="navlink">help</button>
+        <span id="openCount" class="open-count">loading</span>
+      </nav>
+    </header>
+
+    <div id="storageWarn" class="alert" role="alert" hidden>
+      Storage isn't available right now, so changes won't survive a refresh.
+    </div>
+
+    <!-- models page -->
+    <section id="modelsPanel" class="panel" hidden>
+      <h2 class="panel-title">The models</h2>
+      <p>hana-local reads your text with a small open-source language model
+      running on this device over WebGPU. Bigger models read better and need
+      more memory and a stronger GPU. Smaller ones fit lighter hardware but
+      miss more, so lean on the review step. The default ships with the app.
+      Picking any other model downloads it once from a public CDN, then it
+      too runs offline. Switch any time with the picker under the paste box,
+      and your choice is remembered.</p>
+      <div id="modelsList"></div>
+      <p class="models-foot">Whichever model you pick, everything runs here
+      on your device. Sizes are one-time downloads, not ongoing usage.</p>
+    </section>
+
+    <!-- privacy page -->
+    <section id="privacyPanel" class="panel" hidden>
+      <h2 class="panel-title">Your words never leave this device</h2>
+      <p>The model runs here, on your machine. Your tasks are stored here.
+      Your words are never uploaded, and no one, including us, can read
+      them.</p>
+      <h3 class="eyebrow">How that is true</h3>
+      <p>hana-local has no server, no account, and no sync. The language
+      model that reads your pasted text runs inside your browser on your own
+      hardware, using WebGPU. The text you paste is handed to that local
+      model and nowhere else. Your tasks live in your browser's local
+      storage (IndexedDB) on this device only.</p>
+      <h3 class="eyebrow">Nothing to download</h3>
+      <p>The default model ships with the app: its weights are plain files
+      sitting next to this page, served from the same place. Beyond the
+      analytics counts above, opening hana-local fetches nothing from anyone
+      else. If you switch to a different model in the picker, that model
+      downloads once from a public CDN, then works offline from then on. It
+      is a plain file download, the same for everyone, carrying none of your
+      text.</p>
+      <h3 class="eyebrow">What we count, and what we can't see</h3>
+      <p>hana-local uses Google Analytics to understand usage: how many
+      people visit, which model they run, and how many tasks get added.
+      Those are numbers only. Your words are never sent to Google, to us, or
+      to anyone. That covers the text you paste, task titles, notes,
+      projects, and dates. Like any web request, Google receives standard
+      connection details such as your IP address, and a content blocker will
+      block it without affecting the app. Offline, nothing is sent at
+      all.</p>
+      <h3 class="eyebrow">Move your data</h3>
+      <p>Because there is no cloud, the backup and transfer path is a plain
+      file that only you hold. Export writes every task, with its date,
+      project, notes, done state, and Holding Tank state, to a JSON file.
+      Import reads a file back: it adds tasks you don't have and updates the
+      ones you do, field by field, keeping your current value for anything the
+      file leaves out. Import a newer file into an older copy to bring it up
+      to date.</p>
+      <div class="btnrow">
+        <button id="exportBtn" class="ghost-btn">Export tasks</button>
+        <button id="importBtn" class="ghost-btn">Import tasks</button>
+      </div>
+    </section>
+
+    <!-- help page -->
+    <section id="helpPanel" class="panel" hidden>
+      <h2 class="panel-title">How hana-local works</h2>
+      <p>hana-local turns whatever you paste into a clean task list. Drop in a
+      full email, meeting notes, or a single line like "call the vet Friday"
+      and press Make tasks.</p>
+      <h3 class="eyebrow">Adding tasks</h3>
+      <p>A small language model running on this device reads your text, pulls
+      out the real tasks, and shows them for a quick review. Uncheck anything
+      that doesn't belong, edit titles, dates, and projects right there, then
+      press Add. Pressing Enter accepts everything at once. If something you
+      paste matches a task you already have, hana-local updates that task
+      instead of making a duplicate.</p>
+      <h3 class="eyebrow">Dates</h3>
+      <p>New tasks land on today unless your text names a deadline. Tap any
+      date pill to change it. Dates never change on their own. Anything past
+      its date gathers under a Late heading at the top of the list, tinted so
+      it stands out, until you finish it or give it a new date.</p>
+      <h3 class="eyebrow">Active and the Holding Tank</h3>
+      <p>Two lists sit behind the tabs at the top. Active is what you are
+      working on now or soon. The Holding Tank is a backlog for someday, on
+      hold, or waiting-on things. Both keep whatever due dates you set, and
+      nothing moves on its own. Move any task with → Tank or ← Active, and
+      when hana-local reads your pasted text it sorts clear backlog items
+      straight into the tank for you.</p>
+      <h3 class="eyebrow">Everyday use</h3>
+      <p>Tap the circle to finish a task. Finished tasks rest in the Pau
+      section at the bottom of the Active tab. Tap a title to reword it, tap
+      + project to group it, and use the project chips to filter. The ×
+      removes a task for good.</p>
+      <h3 class="eyebrow">The model</h3>
+      <p>hana-local runs a small open-source model in your browser with
+      WebGPU. The default, Qwen2.5 3B, ships with the app and starts loading
+      the moment you open the page, so it is ready before your first paste.
+      The switch-model picker under the paste box trades speed for accuracy.
+      The 3B models read best. The smaller ones fit weaker devices and phones
+      but miss more, so lean on the review step. Switching to a non-default
+      model downloads it once from a public CDN right then, with a progress
+      bar, and your choice is remembered. The models page up top describes
+      each one.</p>
+      <h3 class="eyebrow">Talk instead of type</h3>
+      <p>The paste box is a normal text field, so your device's own dictation
+      types right into it. On a Mac, turn on Dictation in System Settings
+      under Keyboard. On Windows, press the Windows key and H. On a phone,
+      tap the microphone on the keyboard. Dictation is your device's own
+      feature and follows your device's privacy settings.</p>
+      <h3 class="eyebrow">Move your data</h3>
+      <p>Export and Import live on the privacy page. Export saves every task
+      to a file. Import reads one back, adding what's new and updating
+      matches so their status and dates follow the file. Since the file wins
+      on a match, import a newer file, not an older one.</p>
+      <h3 class="eyebrow">Keyboard</h3>
+      <p>⌘↵ or Ctrl↵ runs Make tasks from the paste box. Enter accepts a
+      review. Escape closes this page, the privacy page, or a review.</p>
+    </section>
+
+    <!-- main app -->
+    <main id="mainView">
+      <!-- the pool -->
+      <div class="pool">
+        <textarea id="pool" rows="3"
+          placeholder="Paste an email, meeting notes, or just type what needs doing…"></textarea>
+        <div class="pool-foot">
+          <span class="pool-hint">⌘↵ works too</span>
+          <button id="makeBtn" class="primary-btn" disabled>Make tasks</button>
+        </div>
+      </div>
+
+      <!-- model bar -->
+      <div id="modelBar" class="model-bar">
+        <div class="model-line">
+          <span id="modelBadge" class="model-badge">checking device…</span>
+          <label class="model-pick">
+            <span class="visually-hidden">Model</span>
+            <select id="modelSelect" aria-label="Model choice"></select>
+          </label>
+        </div>
+        <div id="modelProgressWrap" class="progress-wrap" hidden>
+          <div class="progress-track"><div id="modelProgressBar" class="progress-bar"></div></div>
+          <div id="modelProgressText" class="progress-text"></div>
+        </div>
+        <div id="modelNote" class="model-note"></div>
+      </div>
+
+      <!-- errors: the manual fallback. Whatever went wrong, the user can
+           still land the task by hand, title prefilled from the pool. -->
+      <div id="errBox" class="alert err-box" role="alert" hidden>
+        <span id="errMsg"></span>
+        <div class="manual-add">
+          <input id="manualTitle" class="manual-title" placeholder="Type the task" aria-label="Task title" />
+          <input id="manualDate" type="date" class="manual-date" aria-label="Due date" />
+          <button id="manualAddBtn" class="danger-ghost-btn">Add task</button>
+        </div>
+      </div>
+
+      <!-- review tray -->
+      <div id="reviewTray" class="review-tray" hidden></div>
+
+      <!-- tabs -->
+      <div class="tabs" role="tablist" aria-label="Task lists">
+        <button id="tabActive" class="tab" role="tab" aria-selected="true">Active · 0</button>
+        <button id="tabHolding" class="tab" role="tab" aria-selected="false">Holding Tank · 0</button>
+      </div>
+
+      <!-- project chips -->
+      <div id="chips" class="chips" hidden></div>
+
+      <!-- empty message -->
+      <div id="emptyMsg" class="empty" hidden></div>
+
+      <!-- buckets -->
+      <div id="buckets"></div>
+
+      <!-- pau -->
+      <div id="pauSection" class="pau" hidden>
+        <div class="pau-head">
+          <button id="pauToggle" class="pau-toggle">▸ Pau · 0</button>
+          <button id="pauClear" class="pau-clear" hidden>Clear all</button>
+        </div>
+        <div id="pauList"></div>
+      </div>
+    </main>
+
+    <!-- footer -->
+    <footer class="footer">
+      <div id="footTag" class="foot-line">Paste the mess. Get the list. Your tasks never leave this device.</div>
+      <div class="foot-line">Free to use · Built with Claude by
+        <a href="https://www.linkedin.com/in/olinlagon/" target="_blank" rel="noopener noreferrer">Olin Lagon</a>
+      </div>
+      <div class="foot-line"><span id="appVersion"></span> ·
+        <a href="https://github.com/olagon/hana" target="_blank" rel="noopener noreferrer">Open source · MIT license</a>
+      </div>
+    </footer>
+  </div>
+
+  <!-- first-run splash -->
+  <div id="splash" class="splash-overlay" role="dialog" aria-modal="true" aria-label="Welcome to hana-local" hidden>
+    <div id="splashCard" class="splash-card">
+      <div class="splash-title">aloha, this is hana-local</div>
+      <p class="splash-sub">A task manager you can paste anything into. Fully private, fully yours.</p>
+      <h3 class="eyebrow">Paste, review, done</h3>
+      <p>Drop in an email, meeting notes, or one line like "call the vet
+      Friday" and press Make tasks. A small AI pulls out the real tasks and
+      shows them for a quick review before anything is added.</p>
+      <h3 class="eyebrow">Dates handle themselves</h3>
+      <p>New tasks land on today unless your text names a deadline. Tap any
+      date to change it. Dates stay put, and anything overdue gathers under a
+      Late heading at the top so it never hides.</p>
+      <h3 class="eyebrow">Your words never leave this device</h3>
+      <p>The model runs here, on your machine. Your tasks are stored here.
+      The text you paste and the tasks it becomes are never uploaded, and no
+      one, including us, can read them. No server, no account. We do count
+      usage with Google Analytics: visits, model choice, and how many tasks
+      get added. Numbers only, never your words. The privacy page has the
+      full story.</p>
+      <h3 class="eyebrow">Nothing to download</h3>
+      <p>The model ships with the app and is loading in the background right
+      now, so it should be ready by the time you finish reading this.</p>
+      <h3 class="eyebrow">Nothing is locked in</h3>
+      <p>Export saves your tasks to a file and Import brings them into
+      another copy. Both live on the privacy page, which also tells the full
+      privacy story.</p>
+      <button id="splashBtn" class="primary-btn splash-btn">E hana kākou · let's get to work</button>
+    </div>
+  </div>
+
+  <!-- toast -->
+  <div id="toast" class="toast" role="status" hidden></div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>

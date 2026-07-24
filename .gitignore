@@ -1,0 +1,7 @@
+# The bundled model weights are too large for GitHub (one shard is 148 MB,
+# the set is about 1.7 GB). Run ./fetch-model.sh after cloning to rebuild
+# models/ in place. Without it the app still works: the default model then
+# downloads once from the public MLC CDN instead.
+models/
+
+.DS_Store

@@ -3,20 +3,19 @@
 // (Cache API), so this worker deliberately ignores cross-origin requests —
 // it never adds a network dependency, it only removes them.
 
-const CACHE = "hana-local-shell-v7";
+const CACHE = "hana-local-shell-v8";
 
 const SHELL = [
   "./",
   "./index.html",
-  "./styles.css",
-  "./app.js",
-  "./db.js",
-  "./llm.js",
-  "./vendor/web-llm.js",
   "./manifest.webmanifest",
   "./icon.svg",
   "./icon-192.png",
   "./icon-512.png",
+  "./vendor/web-llm.js",
+  "./vendor/preact.module.js",
+  "./vendor/hooks.module.js",
+  "./vendor/htm.module.js",
   "./fonts/fonts.css",
   "./fonts/Fraunces-italic-500.woff2",
   "./fonts/Fraunces-normal-400.woff2",

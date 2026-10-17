@@ -1,63 +1,80 @@
-# hana-local
+# hana local
 
-A fully private, on-device task manager. Paste messy text, a whole email,
-meeting notes, or one loose line, press **Make tasks**, and a small
-open-source language model running in your own browser turns it into a clean
-task list.
+A task manager you can paste anything into, that runs entirely on your own
+device. Drop in a full email, meeting notes, or a single line like "call the
+vet Friday," press Make tasks, and a small open source model running in your
+browser pulls out the real tasks for you to review before anything is added.
 
-**Your words never leave this device.** The model runs here, on your machine,
-via [WebLLM](https://github.com/mlc-ai/web-llm) over WebGPU. Your tasks are
-stored here, in your browser's IndexedDB. No server, no account, no sync.
+**Use it:** https://olagon.github.io/hana-local/
 
-Usage is counted with Google Analytics (tag `G-6RWQDJYE9C` in `index.html`):
-visits, which model is in use (`model_ready`), and how many tasks get added
-(`tasks_added` with counts and method). Numbers only. Pasted text, task
-titles, notes, projects, and dates are never sent to anyone. Offline or with
-a content blocker, the app works identically and nothing is sent.
+No server. No account. No analytics. No tracking. Your words never leave this
+device. Everything the page loads comes from this same site, the fonts, the
+interface, and the WebLLM engine under `vendor/`. The one outside request is
+the one-time download of a model's weights when you pick one, and even that
+disappears if you bundle a model into the site (see below). Turn on airplane
+mode after the download and it keeps working.
 
-## Running it
+## What it does
 
-It is all static files, no build step. Serve this folder from any web server
-(it needs a secure context, so `localhost` or HTTPS) and open it:
+- **Paste anything.** The model labels every line it finds, then hana keeps
+  only real tasks that are yours. Things other people said they would do,
+  newsletters, and plain info land in a Skipped list you can rescue from with
+  one tap.
+- **Dates it gets right.** Phrases like "by Thursday," "week of the 20th," or
+  "in two weeks" are worked out by hana's own date resolver, not guessed by the
+  model, so they land on the right day and nothing gets an invented date.
+- **Review before anything is added.** Edit title, date, and project in place,
+  flip items between Active and the Holding Tank, uncheck what you don't want.
+  Unsure items start unchecked. Enter accepts everything.
+- **Active and the Holding Tank.** Now-or-soon work in one list, someday and
+  waiting-on items in the other. Dates never move on their own; overdue items
+  gather under Late at the top.
+- **Add as is.** Skip the model entirely, one task per line, instant. Also the
+  escape hatch if a read is slow, next to a Stop button.
+- **Voice.** Opt-in mic button using your browser's dictation, with an honest
+  note that Chrome's dictation goes through Google. For fully local voice, use
+  your system's dictation into the box.
+- **Model picker and storage cleanup.** Recommended tiers from WebLLM's live
+  catalog, best first. Remove any downloaded model, remove all but the loaded
+  one, or let hana free the old model automatically when you switch.
+- **Export and import.** The same file format as the Claude version of hana,
+  so tasks move between the two.
+- **Installable.** A PWA with an offline service worker. Add it to your dock or
+  home screen.
+- **Keyboard.** ⌘↵ make tasks, ↵ accept, ⌘⇧↵ add as is, ⌘⇧M voice, ⌘K model
+  panel, / jump to the box, 1 and 2 switch tabs, ? help, esc closes. Ctrl on
+  Windows and Linux.
+
+## Hardware
+
+WebGPU is required, so Chrome or Edge on a laptop or desktop, or Safari on a
+recent Mac. On a 16 GB machine the 8B tier (Qwen3.5 9B or Qwen3 8B) is the
+sweet spot. Phones should stay in the light tier.
+
+## Running your own copy
+
+The site is static files. Clone the repo and serve the folder with any web
+server, or publish it with GitHub Pages. Opening `index.html` straight from
+the file system will not work, because browsers block module imports there.
+
+To ship a model inside your copy so the first run needs no download at all,
+run `./fetch-model.sh`. It places the default model's weights under `models/`,
+which is ignored by git because the files are too large for GitHub. hana
+detects them and loads that model from your own site.
+
+## Updating the engine
+
+`vendor/web-llm.js` is a single-file bundle of `@mlc-ai/web-llm`. To refresh
+it to a newer release, which also refreshes the model catalog:
 
 ```
-python3 -m http.server 8080
+npm install @mlc-ai/web-llm@latest
+npx esbuild node_modules/@mlc-ai/web-llm/lib/index.js --bundle --format=esm --platform=browser --minify --outfile=vendor/web-llm.js
 ```
-
-Requirements: a browser with WebGPU (current Chrome, Edge, or Safari) and
-enough memory for the model you pick.
-
-## The bundled model
-
-The default model, Qwen2.5 3B quantized to q4, is about 1.7 GB and is too
-large to live in this repository. You have two options after cloning:
-
-1. Run `./fetch-model.sh`. It rebuilds `models/` in place so the app serves
-   the model from its own origin and never touches a CDN.
-2. Do nothing. The app detects the missing folder and downloads the default
-   model once from the public MLC CDN instead, then caches it offline.
-
-Seven models are available in the app, from an 8B for strong machines down
-to a 280 MB taster. The models page inside the app describes each one.
-
-## Layout
-
-- `index.html`, `styles.css`, `app.js`: the app (vanilla JS)
-- `db.js`: tiny IndexedDB wrapper for tasks and settings
-- `llm.js`: WebLLM engine wrapper with grammar-constrained JSON extraction
-- `vendor/web-llm.js`: the WebLLM library, hosted locally
-- `models/`: the bundled default model, created by `fetch-model.sh`
-- `fonts/`: Fraunces, IBM Plex Sans, IBM Plex Mono, hosted locally
-- `sw.js`, `manifest.webmanifest`, icons: PWA install and offline app shell
-  (bump the cache version in `sw.js` when deploying changes)
-
-## Moving data
-
-Export writes every task (dates, projects, notes, done, Holding Tank state)
-to a JSON file. Import reads one back, adding what's new and updating matches
-field by field. That file is the backup and transfer path, and it is
-compatible with exports from [hana](https://github.com/olagon/hana).
 
 ## License
 
-MIT. Built with Claude by Olin Lagon.
+MIT. See [LICENSE](LICENSE).
+
+Built with Claude by [Olin Lagon](https://www.linkedin.com/in/olinlagon/).
+The Claude-powered version lives at [olagon/hana](https://github.com/olagon/hana).

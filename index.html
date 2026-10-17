@@ -2,277 +2,1238 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>hana-local · private task manager</title>
-<meta name="description" content="A fully private task manager. The AI runs on your device. Your words never leave it." />
-<meta name="theme-color" content="#EFF3EC" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="color-scheme" content="light dark" />
+<title>hana local · private task manager</title>
+<meta name="description" content="A fully private task manager. The model runs on your device. Your words never leave it." />
+<meta name="theme-color" content="#EFF3EC" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#141A16" media="(prefers-color-scheme: dark)" />
 <link rel="manifest" href="manifest.webmanifest" />
 <link rel="icon" href="icon.svg" type="image/svg+xml" />
 <link rel="apple-touch-icon" href="icon-192.png" />
 <link rel="stylesheet" href="fonts/fonts.css" />
-<link rel="stylesheet" href="styles.css" />
-<!-- Google Analytics: usage counts only. Task text never goes anywhere.
-     Offline or blocked, the app works identically. -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-6RWQDJYE9C"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag() { dataLayer.push(arguments); }
-  gtag("js", new Date());
-  gtag("config", "G-6RWQDJYE9C");
+<script type="importmap">
+{ "imports": { "preact": "./vendor/preact.module.js", "preact/hooks": "./vendor/hooks.module.js", "htm": "./vendor/htm.module.js" } }
 </script>
+<style>
+  :root{
+    --bg:#EFF3EC; --ink:#22362B; --sub:#66756B; --line:#D5DED2;
+    --pool:#E6EDE4; --poolBorder:#C7D4C6; --card:#FBFCFA; --field:#FFFFFF;
+    --accent:#744B63; --accentDark:#5E3B50; --accentSoft:#EFE6EC;
+    --done:#47694F; --doneSoft:#E4EFE6; --danger:#A05252; --dangerSoft:#F6E5E1; --dangerLine:#E3C9BE;
+    --lateWash:rgba(160,82,82,0.04); --shadow:0 12px 40px rgba(34,54,43,0.12);
+    --toastBg:#22362B; --toastInk:#fff;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#141A16; --ink:#E6ECE7; --sub:#96A69B; --line:#27332B;
+      --pool:#1B231E; --poolBorder:#2E3A32; --card:#192019; --field:#101511;
+      --accent:#C9A0BB; --accentDark:#DDB8D1; --accentSoft:#2E2430;
+      --done:#8CC497; --doneSoft:#1E2E22; --danger:#E09A9A; --dangerSoft:#33201F; --dangerLine:#4A2D2B;
+      --lateWash:rgba(224,154,154,0.06); --shadow:0 12px 40px rgba(0,0,0,0.45);
+      --toastBg:#E6ECE7; --toastInk:#141A16;
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:'IBM Plex Sans',system-ui,sans-serif; line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  button, input, textarea, select{font-family:inherit; color:inherit;}
+  button{cursor:pointer;}
+  button:disabled{cursor:default; opacity:0.6;}
+  *:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:4px;}
+  textarea::placeholder, input::placeholder{color:var(--sub); opacity:0.8;}
+  a{color:var(--accent);}
+  .wrap{max-width:660px; margin:0 auto; padding:0 16px 96px;}
+  .serif{font-family:'Fraunces',serif; font-style:italic; font-weight:500; letter-spacing:-0.01em;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  .row{display:flex; align-items:center;}
+  .between{justify-content:space-between;}
+  .gap2{gap:8px;} .gap3{gap:12px;}
+  .wrapflex{flex-wrap:wrap;}
+  .card{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px 18px; font-size:14.5px; line-height:1.65;}
+  .eyebrow{font-size:11px; letter-spacing:0.09em; text-transform:uppercase; color:var(--sub); margin:16px 0 4px;}
+  .para{margin:0; color:var(--ink);}
+  .pill{display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:2px 8px; font-size:11.5px; border:none; background:var(--pool); color:var(--sub);}
+  .ghost{background:none; border:1px solid var(--line); color:var(--ink); border-radius:999px; padding:6px 14px; font-size:13.5px;}
+  .ghost.accent{border-color:var(--accent); color:var(--accent);}
+  .ghost.danger{border-color:var(--dangerLine); color:var(--danger);}
+  .primary{background:var(--accent); color:#fff; border:none; border-radius:999px; padding:7px 18px; font-size:14px; font-weight:500; transition:background 120ms ease;}
+  .primary:hover:not(:disabled){background:var(--accentDark);}
+  .primary:disabled{background:var(--poolBorder); color:#fff;}
+  .linkbtn{background:none; border:none; padding:0; color:var(--accent); text-decoration:underline; font:inherit;}
+  .field{font:inherit; color:var(--ink); background:var(--field); border:1px solid var(--poolBorder); border-radius:6px; padding:3px 7px;}
+  .tabs{display:flex; gap:4px; margin-top:20px; background:var(--pool); border:1px solid var(--poolBorder); border-radius:999px; padding:3px;}
+  .tab{flex:1; font-size:13px; font-weight:500; color:var(--sub); background:transparent; border:none; border-radius:999px; padding:6px 12px; transition:all 120ms ease;}
+  .tab.on{background:var(--accent); color:#fff; font-weight:600;}
+  .chips{display:flex; gap:8px; overflow-x:auto; margin-top:14px; padding-bottom:2px;}
+  .chip{white-space:nowrap; font-size:12.5px; border-radius:999px; padding:4px 12px; border:1px solid var(--line); background:transparent; color:var(--sub); transition:all 120ms ease;}
+  .chip.on{border-color:var(--accent); background:var(--accent); color:#fff;}
+  .bucket{margin-top:22px;}
+  .bucket h3{font-size:11px; letter-spacing:0.09em; text-transform:uppercase; color:var(--sub); padding-bottom:6px; border-bottom:1px solid var(--line); margin:0; font-weight:500;}
+  .bucket.late h3{color:var(--danger); border-color:var(--dangerLine);}
+  .trow{display:flex; align-items:flex-start; gap:12px; padding:10px 0 10px 8px; margin-left:-10px; border-bottom:1px solid var(--line); border-left:2px solid transparent;}
+  .trow.late{border-left-color:var(--danger); background:var(--lateWash);}
+  .circle{flex-shrink:0; width:20px; height:20px; border-radius:50%; border:1.5px solid var(--sub); background:transparent; margin-top:2px; display:flex; align-items:center; justify-content:center; padding:0; transition:background 120ms ease, border-color 120ms ease;}
+  .circle.done{background:var(--done); border-color:var(--done);}
+  .title{font-size:15px; line-height:1.45; color:var(--ink); overflow-wrap:anywhere; cursor:text;}
+  .title.done{color:var(--sub); text-decoration:line-through; cursor:default;}
+  .notes{font-size:12.5px; color:var(--sub); margin-top:1px; overflow-wrap:anywhere;}
+  .meta{display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:4px;}
+  .datepill{font-family:'IBM Plex Mono',monospace; font-size:11.5px; color:var(--sub); background:var(--pool); border:none; border-radius:999px; padding:2px 8px;}
+  .datepill.today{color:var(--accent);}
+  .datepill.late{color:var(--danger); background:var(--dangerSoft); font-weight:500;}
+  .projchip{font-size:11.5px; color:var(--sub); background:transparent; border:1px dashed var(--line); border-radius:999px; padding:2px 8px;}
+  .projchip.set{color:var(--accent); background:var(--accentSoft); border:none;}
+  .movechip{font-size:11.5px; color:var(--sub); background:transparent; border:1px dashed var(--line); border-radius:999px; padding:2px 8px;}
+  .x{color:var(--sub); opacity:0.55; font-size:16px; line-height:1; background:none; border:none; padding:2px 4px; margin-top:2px;}
+  .x:hover{opacity:1;}
+  .pool{background:var(--pool); border:1px solid var(--poolBorder); border-radius:14px; padding:12px; margin-top:4px;}
+  .pool textarea{width:100%; resize:none; background:transparent; border:none; outline:none; font-size:15px; line-height:1.5; color:var(--ink); font-family:'IBM Plex Sans',sans-serif; min-height:72px;}
+  .hint{font-family:'IBM Plex Mono',monospace; font-size:11px; color:var(--sub);}
+  .badge{display:inline-flex; align-items:center; gap:6px; font-family:'IBM Plex Mono',monospace; font-size:11.5px; border-radius:999px; padding:3px 10px; border:1px solid var(--line); color:var(--sub); background:var(--card); white-space:nowrap; max-width:100%;}
+  .badge .dot{width:7px; height:7px; border-radius:50%; background:var(--sub); flex-shrink:0;}
+  .badge.ready .dot{background:var(--done);}
+  .badge.loading .dot{background:var(--accent); animation:hana-pulse 1.2s ease-in-out infinite;}
+  .badge.error .dot{background:var(--danger);}
+  .badge.busy .dot{background:var(--accent); animation:hana-pulse 0.9s ease-in-out infinite;}
+  .progress{height:6px; background:var(--pool); border:1px solid var(--poolBorder); border-radius:999px; overflow:hidden;}
+  .progress > div{height:100%; background:var(--accent); transition:width 200ms ease;}
+  .alert{background:var(--dangerSoft); border:1px solid var(--dangerLine); color:var(--danger); border-radius:10px; padding:8px 12px; font-size:13px; margin-top:10px;}
+  .notice{background:var(--accentSoft); border:1px solid var(--line); color:var(--ink); border-radius:10px; padding:10px 12px; font-size:13.5px; margin-top:10px;}
+  .review{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; margin-top:10px;}
+  .ritem{display:flex; align-items:flex-start; gap:10px; padding:8px 0; border-bottom:1px solid var(--line);}
+  .ritem:last-of-type{border-bottom:none;}
+  .ritem input[type=checkbox]{margin-top:7px; accent-color:var(--accent); flex-shrink:0;}
+  .ritem .t{width:100%; font:inherit; font-size:14.5px; color:var(--ink); background:var(--field); border:1px solid var(--line); border-radius:6px; padding:4px 8px;}
+  .small{font-size:12px; color:var(--sub);}
+  .tag{display:inline-block; font-family:'IBM Plex Mono',monospace; font-size:10.5px; border-radius:999px; padding:1px 7px; background:var(--pool); color:var(--sub);}
+  .tag.tank{background:var(--accentSoft); color:var(--accent);}
+  .tag.low{background:var(--dangerSoft); color:var(--danger);}
+  .skipped{margin-top:10px; border-top:1px dashed var(--line); padding-top:8px;}
+  .skipped .srow{display:flex; align-items:center; gap:8px; padding:5px 0; font-size:13px; color:var(--sub);}
+  .skipped .srow span.why{font-family:'IBM Plex Mono',monospace; font-size:10.5px; color:var(--sub); background:var(--pool); border-radius:999px; padding:1px 7px; white-space:nowrap;}
+  .toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--toastBg); color:var(--toastInk); border-radius:999px; padding:8px 18px; font-size:13.5px; box-shadow:0 4px 16px rgba(0,0,0,0.25); z-index:50; display:flex; align-items:center; gap:12px; max-width:92vw;}
+  .toast button{background:none; border:none; color:inherit; text-decoration:underline; font:inherit; padding:0;}
+  .overlay{position:fixed; inset:0; background:rgba(20,26,22,0.5); display:flex; align-items:center; justify-content:center; padding:16px; z-index:100;}
+  .modal{background:var(--card); border-radius:16px; padding:26px 24px; max-width:460px; width:100%; max-height:86vh; overflow-y:auto; font-size:14.5px; line-height:1.6; box-shadow:var(--shadow); border:1px solid var(--line);}
+  .mic{display:flex; align-items:center; justify-content:center; width:30px; height:30px; border-radius:50%; border:1px solid var(--poolBorder); background:var(--field); color:var(--sub); flex-shrink:0; padding:0;}
+  .mic.on{border-color:var(--danger); background:var(--dangerSoft); color:var(--danger); animation:hana-pulse 1.2s ease-in-out infinite;}
+  .mrow{display:flex; align-items:flex-start; gap:10px; padding:10px 0; border-bottom:1px solid var(--line);}
+  .mrow:last-child{border-bottom:none;}
+  .mrow input[type=radio]{margin-top:5px; accent-color:var(--accent);}
+  .mname{font-weight:500; color:var(--ink);}
+  .msub{font-size:12px; color:var(--sub);}
+  .kbd{font-family:'IBM Plex Mono',monospace; font-size:11px; background:var(--pool); border:1px solid var(--poolBorder); border-radius:5px; padding:1px 6px; color:var(--ink);}
+  .shortcuts{display:grid; grid-template-columns:auto 1fr; gap:6px 14px; align-items:center; margin:8px 0 0; font-size:13.5px;}
+  .center{text-align:center;}
+  .empty{text-align:center; color:var(--sub); font-size:14px; padding:48px 12px;}
+  .hdr{display:flex; align-items:baseline; justify-content:space-between; padding:30px 0 16px; gap:12px; flex-wrap:wrap;}
+  .hdr h1{margin:0; font-size:30px;}
+  .hdr .links{display:flex; align-items:baseline; gap:12px; flex-wrap:wrap; font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--sub);}
+  .hdr .links button{background:none; border:none; padding:0; text-decoration:underline; color:var(--sub); font:inherit;}
+  .hdr .links button.on{color:var(--accent);}
+  select.field{padding:5px 8px; max-width:100%;}
+  @keyframes hana-pulse{0%,100%{opacity:1;}50%{opacity:0.45;}}
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important; animation:none !important;} }
+</style>
 </head>
 <body>
-  <datalist id="hana-projects"></datalist>
-  <input id="importFile" type="file" accept=".json,application/json" hidden />
+<div id="app"></div>
+<script type="module">
+import { h, render } from "preact";
+import { useState, useEffect, useRef, useMemo } from "preact/hooks";
+import htm from "htm";
+const html = htm.bind(h);
 
-  <div class="wrap">
-    <!-- header -->
-    <header class="header">
-      <h1 class="wordmark">hana<span class="wordmark-local">local</span></h1>
-      <nav class="header-links" aria-label="Pages">
-        <button id="navModels" class="navlink">models</button>
-        <button id="navPrivacy" class="navlink">privacy/export</button>
-        <button id="navHelp" class="navlink">help</button>
-        <span id="openCount" class="open-count">loading</span>
-      </nav>
-    </header>
+// ======================================================================
+// hana local. Paste the mess, get the list. The model runs on your device.
+// Everything this page loads comes from this same site: fonts, the UI
+// library, and the WebLLM engine under vendor/. The only outside request is
+// the one-time download of a model's weights when you pick one.
+// ======================================================================
+const APP_VERSION = "0.8.0";
+// Same database and keys as earlier hana-local versions, so an upgrade keeps
+// every task and setting in place.
+const DB_NAME = "hana-local";
+const DB_STORE = "kv";
+const TASKS_KEY = "tasks";
+const SETTINGS_KEY = "settings";
+const UPDATE_PAGE = "https://olagon.github.io/hana/";
+const SOURCE_URL = "https://github.com/olagon/hana-local";
 
-    <div id="storageWarn" class="alert" role="alert" hidden>
-      Storage isn't available right now, so changes won't survive a refresh.
-    </div>
+// ---------- tiny IndexedDB key-value store ----------
+let dbPromise = null;
+function openDB() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = () => { if (!req.result.objectStoreNames.contains(DB_STORE)) req.result.createObjectStore(DB_STORE); };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+    req.onblocked = () => reject(new Error("indexeddb blocked"));
+  });
+  return dbPromise;
+}
+async function idbGet(key) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => { const tx = db.transaction(DB_STORE, "readonly"); const rq = tx.objectStore(DB_STORE).get(key); rq.onsuccess = () => resolve(rq.result); rq.onerror = () => reject(rq.error); });
+}
+async function idbSet(key, value) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => { const tx = db.transaction(DB_STORE, "readwrite"); tx.objectStore(DB_STORE).put(value, key); tx.oncomplete = () => resolve(); tx.onerror = () => reject(tx.error); tx.onabort = () => reject(tx.error || new Error("aborted")); });
+}
 
-    <!-- models page -->
-    <section id="modelsPanel" class="panel" hidden>
-      <h2 class="panel-title">The models</h2>
-      <p>hana-local reads your text with a small open-source language model
-      running on this device over WebGPU. Bigger models read better and need
-      more memory and a stronger GPU. Smaller ones fit lighter hardware but
-      miss more, so lean on the review step. The default ships with the app.
-      Picking any other model downloads it once from a public CDN, then it
-      too runs offline. Switch any time with the picker under the paste box,
-      and your choice is remembered.</p>
-      <div id="modelsList"></div>
-      <p class="models-foot">Whichever model you pick, everything runs here
-      on your device. Sizes are one-time downloads, not ongoing usage.</p>
-    </section>
+// ---------- a model that ships with the site ----------
+// If the weights for this model sit under models/ next to this page (see
+// fetch-model.sh), it loads from this origin with no outside download at all.
+// A plain GitHub Pages deploy does not carry them, and then it downloads once
+// from the public model host like any other pick.
+const LOCAL_MODEL_ID = "Qwen2.5-3B-Instruct-q4f16_1-MLC";
+const LOCAL_MODEL_LIB = "models/libs/Qwen2.5-3B-Instruct-q4f16_1_cs1k-webgpu.wasm";
+let localModelPresent = null;
+async function hasLocalModel() {
+  if (localModelPresent !== null) return localModelPresent;
+  try {
+    const r = await fetch(new URL(`models/${LOCAL_MODEL_ID}/resolve/main/mlc-chat-config.json`, document.baseURI), { method: "HEAD" });
+    localModelPresent = r.ok;
+  } catch (e) { localModelPresent = false; }
+  return localModelPresent;
+}
+function appConfigFor(w, useLocal) {
+  if (!useLocal) return w.prebuiltAppConfig;
+  return { ...w.prebuiltAppConfig, model_list: w.prebuiltAppConfig.model_list.map((m) => m.model_id === LOCAL_MODEL_ID
+    ? { ...m, model: new URL(`models/${LOCAL_MODEL_ID}`, document.baseURI).href, model_lib: new URL(LOCAL_MODEL_LIB, document.baseURI).href }
+    : m) };
+}
 
-    <!-- privacy page -->
-    <section id="privacyPanel" class="panel" hidden>
-      <h2 class="panel-title">Your words never leave this device</h2>
-      <p>The model runs here, on your machine. Your tasks are stored here.
-      Your words are never uploaded, and no one, including us, can read
-      them.</p>
-      <h3 class="eyebrow">How that is true</h3>
-      <p>hana-local has no server, no account, and no sync. The language
-      model that reads your pasted text runs inside your browser on your own
-      hardware, using WebGPU. The text you paste is handed to that local
-      model and nowhere else. Your tasks live in your browser's local
-      storage (IndexedDB) on this device only.</p>
-      <h3 class="eyebrow">Nothing to download</h3>
-      <p>The default model ships with the app: its weights are plain files
-      sitting next to this page, served from the same place. Beyond the
-      analytics counts above, opening hana-local fetches nothing from anyone
-      else. If you switch to a different model in the picker, that model
-      downloads once from a public CDN, then works offline from then on. It
-      is a plain file download, the same for everyone, carrying none of your
-      text.</p>
-      <h3 class="eyebrow">What we count, and what we can't see</h3>
-      <p>hana-local uses Google Analytics to understand usage: how many
-      people visit, which model they run, and how many tasks get added.
-      Those are numbers only. Your words are never sent to Google, to us, or
-      to anyone. That covers the text you paste, task titles, notes,
-      projects, and dates. Like any web request, Google receives standard
-      connection details such as your IP address, and a content blocker will
-      block it without affecting the app. Offline, nothing is sent at
-      all.</p>
-      <h3 class="eyebrow">Move your data</h3>
-      <p>Because there is no cloud, the backup and transfer path is a plain
-      file that only you hold. Export writes every task, with its date,
-      project, notes, done state, and Holding Tank state, to a JSON file.
-      Import reads a file back: it adds tasks you don't have and updates the
-      ones you do, field by field, keeping your current value for anything the
-      file leaves out. Import a newer file into an older copy to bring it up
-      to date.</p>
-      <div class="btnrow">
-        <button id="exportBtn" class="ghost-btn">Export tasks</button>
-        <button id="importBtn" class="ghost-btn">Import tasks</button>
-      </div>
-    </section>
+// ---------- dates ----------
+const pad = (n) => String(n).padStart(2, "0");
+const toStr = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const todayStr = () => toStr(new Date());
+const parseYMD = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+const addDays = (str, n) => { const dt = parseYMD(str); dt.setDate(dt.getDate() + n); return toStr(dt); };
+const weekdayOf = (str) => parseYMD(str).toLocaleDateString("en-US", { weekday: "long" });
+const isDateStr = (s) => typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s) && !isNaN(parseYMD(s).getTime());
+const displayDate = (str) => {
+  const t = todayStr();
+  if (str === t) return "Today";
+  if (str === addDays(t, 1)) return "Tomorrow";
+  const dt = parseYMD(str);
+  const opts = { month: "short", day: "numeric" };
+  if (dt.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
+  return dt.toLocaleDateString("en-US", opts);
+};
+const uid = () => (window.crypto && window.crypto.randomUUID) ? window.crypto.randomUUID() : `t${Date.now()}${Math.floor(Math.random() * 1e6)}`;
 
-    <!-- help page -->
-    <section id="helpPanel" class="panel" hidden>
-      <h2 class="panel-title">How hana-local works</h2>
-      <p>hana-local turns whatever you paste into a clean task list. Drop in a
-      full email, meeting notes, or a single line like "call the vet Friday"
-      and press Make tasks.</p>
-      <h3 class="eyebrow">Adding tasks</h3>
-      <p>A small language model running on this device reads your text, pulls
-      out the real tasks, and shows them for a quick review. Uncheck anything
-      that doesn't belong, edit titles, dates, and projects right there, then
-      press Add. Pressing Enter accepts everything at once. If something you
-      paste matches a task you already have, hana-local updates that task
-      instead of making a duplicate.</p>
-      <h3 class="eyebrow">Dates</h3>
-      <p>New tasks land on today unless your text names a deadline. Tap any
-      date pill to change it. Dates never change on their own. Anything past
-      its date gathers under a Late heading at the top of the list, tinted so
-      it stands out, until you finish it or give it a new date.</p>
-      <h3 class="eyebrow">Active and the Holding Tank</h3>
-      <p>Two lists sit behind the tabs at the top. Active is what you are
-      working on now or soon. The Holding Tank is a backlog for someday, on
-      hold, or waiting-on things. Both keep whatever due dates you set, and
-      nothing moves on its own. Move any task with → Tank or ← Active, and
-      when hana-local reads your pasted text it sorts clear backlog items
-      straight into the tank for you.</p>
-      <h3 class="eyebrow">Everyday use</h3>
-      <p>Tap the circle to finish a task. Finished tasks rest in the Pau
-      section at the bottom of the Active tab. Tap a title to reword it, tap
-      + project to group it, and use the project chips to filter. The ×
-      removes a task for good.</p>
-      <h3 class="eyebrow">The model</h3>
-      <p>hana-local runs a small open-source model in your browser with
-      WebGPU. The default, Qwen2.5 3B, ships with the app and starts loading
-      the moment you open the page, so it is ready before your first paste.
-      The switch-model picker under the paste box trades speed for accuracy.
-      The 3B models read best. The smaller ones fit weaker devices and phones
-      but miss more, so lean on the review step. Switching to a non-default
-      model downloads it once from a public CDN right then, with a progress
-      bar, and your choice is remembered. The models page up top describes
-      each one.</p>
-      <h3 class="eyebrow">Talk instead of type</h3>
-      <p>The paste box is a normal text field, so your device's own dictation
-      types right into it. On a Mac, turn on Dictation in System Settings
-      under Keyboard. On Windows, press the Windows key and H. On a phone,
-      tap the microphone on the keyboard. Dictation is your device's own
-      feature and follows your device's privacy settings.</p>
-      <h3 class="eyebrow">Move your data</h3>
-      <p>Export and Import live on the privacy page. Export saves every task
-      to a file. Import reads one back, adding what's new and updating
-      matches so their status and dates follow the file. Since the file wins
-      on a match, import a newer file, not an older one.</p>
-      <h3 class="eyebrow">Keyboard</h3>
-      <p>⌘↵ or Ctrl↵ runs Make tasks from the paste box. Enter accepts a
-      review. Escape closes this page, the privacy page, or a review.</p>
-    </section>
+// Deterministic resolver for relative date phrases. Small models are bad at
+// date math, code is perfect at it, so the model only has to find the phrase.
+const WD = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+const WD3 = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
+const MONTHS = ["january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"];
+const NUMWORD = { a: 1, an: 1, one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7, eight: 8, nine: 9, ten: 10 };
+export function resolveDue(phraseRaw, today) {
+  if (!phraseRaw) return null;
+  const p = String(phraseRaw).toLowerCase().replace(/[.,!?;:()]/g, " ").replace(/\s+/g, " ").trim();
+  if (!p) return null;
+  const t = parseYMD(today);
+  const tDow = t.getDay();
+  const out = (d) => toStr(d);
+  const plus = (n) => { const d = new Date(t); d.setDate(d.getDate() + n); return out(d); };
+  let m;
+  if (/\b(today|tonight|eod|end of (the )?day|asap|right away|immediately)\b/.test(p)) return today;
+  if (/\bday after tomorrow\b/.test(p)) return plus(2);
+  if (/\btomorrow\b/.test(p)) return plus(1);
+  if ((m = p.match(/\bin (\d+|a|an|one|two|three|four|five|six|seven|eight|nine|ten) (day|days|week|weeks|month|months)\b/))) {
+    const n = NUMWORD[m[1]] || parseInt(m[1], 10);
+    if (/day/.test(m[2])) return plus(n);
+    if (/week/.test(m[2])) return plus(7 * n);
+    const d = new Date(t); d.setMonth(d.getMonth() + n); return out(d);
+  }
+  if (/\bnext week\b/.test(p)) { const add = ((8 - tDow) % 7) || 7; return plus(add); }
+  if (/\b(this week|end of (the )?week|eow)\b/.test(p)) { const add = (5 - tDow + 7) % 7; return plus(add); }
+  if (/\b(end of (the )?month|eom)\b/.test(p)) return out(new Date(t.getFullYear(), t.getMonth() + 1, 0));
+  if (/\bnext month\b/.test(p)) return out(new Date(t.getFullYear(), t.getMonth() + 1, 1));
+  if ((m = p.match(/\b(\d{4})-(\d{2})-(\d{2})\b/))) return isDateStr(`${m[1]}-${m[2]}-${m[3]}`) ? `${m[1]}-${m[2]}-${m[3]}` : null;
+  if ((m = p.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/))) {
+    let y = t.getFullYear();
+    if (m[3]) { y = parseInt(m[3], 10); if (y < 100) y += 2000; }
+    let d = new Date(y, parseInt(m[1], 10) - 1, parseInt(m[2], 10));
+    if (!m[3] && d < t && (t - d) / 86400000 > 45) d = new Date(y + 1, parseInt(m[1], 10) - 1, parseInt(m[2], 10));
+    if (!isNaN(d.getTime())) return out(d);
+  }
+  for (let mi = 0; mi < 12; mi++) {
+    const name = MONTHS[mi];
+    const re = new RegExp("\\b(" + name.slice(0, 3) + "[a-z]*)\\b");
+    if (!re.test(p)) continue;
+    let dm = p.match(new RegExp(name.slice(0, 3) + "[a-z]*\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b")) ||
+             p.match(new RegExp("(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?" + name.slice(0, 3) + "[a-z]*"));
+    const y = t.getFullYear();
+    if (dm) {
+      let d = new Date(y, mi, parseInt(dm[1], 10));
+      if (d < t && (t - d) / 86400000 > 45) d = new Date(y + 1, mi, parseInt(dm[1], 10));
+      return out(d);
+    }
+    let d = new Date(y, mi, 1);
+    if (mi < t.getMonth()) d = new Date(y + 1, mi, 1);
+    return out(d);
+  }
+  for (let i = 0; i < 7; i++) {
+    const re = new RegExp("\\b(next |this |coming )?(" + WD[i] + "|" + WD3[i] + ")\\b");
+    const mm = p.match(re);
+    if (mm) {
+      let add = (i - tDow + 7) % 7;
+      if (mm[1] && mm[1].trim() === "next" && add < 7) add += 7;
+      return plus(add);
+    }
+  }
+  if ((m = p.match(/\b(\d{1,2})(?:st|nd|rd|th)\b/))) {
+    const day = parseInt(m[1], 10);
+    if (day >= 1 && day <= 31) {
+      let d = new Date(t.getFullYear(), t.getMonth(), day);
+      if (d < t) d = new Date(t.getFullYear(), t.getMonth() + 1, day);
+      return out(d);
+    }
+  }
+  return null;
+}
 
-    <!-- main app: one column on small screens, capture right + tasks left
-         on large ones -->
-    <main id="mainView">
-      <div id="captureCol">
-      <!-- the pool -->
-      <div class="pool">
-        <textarea id="pool" rows="3"
-          placeholder="Paste an email, meeting notes, or just type what needs doing…"></textarea>
-        <div class="pool-foot">
-          <span class="pool-hint">⌘↵ works too</span>
-          <button id="makeBtn" class="primary-btn" disabled>Make tasks</button>
+// ---------- text helpers ----------
+const STOP = new Set(["the", "a", "an", "to", "for", "of", "and", "on", "in", "with", "re", "about", "at", "by", "up", "my", "our", "your", "me", "it", "this", "that"]);
+const tokens = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter((w) => w && !STOP.has(w));
+export function similarity(a, b) {
+  const A = new Set(tokens(a)), B = new Set(tokens(b));
+  if (!A.size || !B.size) return 0;
+  let inter = 0; A.forEach((w) => { if (B.has(w)) inter++; });
+  const jac = inter / (A.size + B.size - inter);
+  const containment = inter / Math.min(A.size, B.size);
+  return Math.max(jac, containment >= 1 && Math.min(A.size, B.size) >= 2 ? 0.85 : 0);
+}
+const cleanTitle = (s) => {
+  let t = String(s || "").replace(/\s+/g, " ").trim().replace(/[.\s]+$/, "");
+  if (!t) return "";
+  t = t.charAt(0).toUpperCase() + t.slice(1);
+  if (t.length > 90) t = t.slice(0, 87) + "...";
+  return t;
+};
+const clamp01 = (n) => (typeof n === "number" && isFinite(n) ? Math.max(0, Math.min(1, n)) : 0.5);
+
+// ---------- extraction contract ----------
+// The model labels EVERY candidate line. Code decides what to keep. Small
+// models are far better at labeling than at silently omitting, so this
+// classify-then-filter design is the big accuracy win.
+const SCHEMA = {
+  type: "object",
+  properties: {
+    items: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          text: { type: "string" },
+          owner: { type: "string", enum: ["me", "someone_else", "unclear"] },
+          kind: { type: "string", enum: ["task", "question", "fyi", "marketing", "other"] },
+          title: { type: "string" },
+          due_text: { type: "string" },
+          due: { type: "string" },
+          urgency: { type: "string", enum: ["now", "soon", "someday", "waiting"] },
+          project: { type: "string" },
+          notes: { type: "string" },
+          same_as_id: { type: "string" },
+          confidence: { type: "number" }
+        },
+        required: ["text", "owner", "kind", "title", "due_text", "due", "urgency", "project", "notes", "same_as_id", "confidence"]
+      }
+    }
+  },
+  required: ["items"]
+};
+
+const SYSTEM_PROMPT = (today) => `You are the task reader inside hana, a personal task manager. You read messy text (emails, notes, chat) and label every line that could be a task. Today is ${weekdayOf(today)}, ${today}.
+
+Label EVERY candidate. Never silently drop one. The app decides what to keep.
+For each candidate give:
+- text: the short source phrase it came from
+- owner: "me" when the reader is expected to do it (requests to the reader, "can you", "you were going to", questions that need the reader to act), "someone_else" when another person says they will do it or it is assigned to someone else, "unclear" otherwise
+- kind: "task" for a concrete action, "question" for a question that needs the reader to answer or act, "fyi" for information with no action, "marketing" for promotions, newsletters, and calls to action from businesses, "other"
+- title: short, verb-first, under 10 words, ONE action per item. Split compound sentences into separate items.
+- due_text: the exact date phrase from the text, like "by Thursday", "week of the 20th", "next week", "July 3". Use "" if there is none. Copy it, do not rephrase it.
+- due: your best YYYY-MM-DD guess for due_text, or "" if none
+- urgency: "now" for today or overdue, "soon" for anything dated or expected within a couple of weeks, "someday" for no rush, at some point, eventually, backlog, ideas, "waiting" when blocked on someone else
+- project: an existing project name that fits, or a short new one if obvious, else ""
+- notes: one short sentence of context, or ""
+- same_as_id: the id of an existing open task when this is the SAME task being rescheduled, reworded, or given more detail. A different person, company, deliverable, or action is a different task. When unsure, use "".
+- confidence: 0 to 1 that this is a real task for the reader`;
+
+const EXAMPLE_IN_1 = `EXISTING OPEN TASKS: []
+PROJECTS: []
+TEXT:
+<<<
+Can you send the deck by Thursday? Also Lisa will handle catering. Our newsletter goes out Friday, hit reply for a shout out!
+>>>`;
+const EXAMPLE_OUT_1 = JSON.stringify({ items: [
+  { text: "send the deck by Thursday", owner: "me", kind: "task", title: "Send the deck", due_text: "by Thursday", due: "", urgency: "soon", project: "", notes: "", same_as_id: "", confidence: 0.95 },
+  { text: "Lisa will handle catering", owner: "someone_else", kind: "task", title: "Handle catering", due_text: "", due: "", urgency: "soon", project: "", notes: "Lisa owns this", same_as_id: "", confidence: 0.9 },
+  { text: "newsletter goes out Friday, hit reply for a shout out", owner: "unclear", kind: "marketing", title: "Reply for a newsletter shout out", due_text: "Friday", due: "", urgency: "soon", project: "", notes: "", same_as_id: "", confidence: 0.15 }
+] });
+const EXAMPLE_IN_2 = `EXISTING OPEN TASKS: [{"id":"abc","title":"Call Mysa about the RFP","project":"Sales","due":"2026-07-20","holding":false}]
+PROJECTS: ["Sales"]
+TEXT:
+<<<
+Someday we should redo the website, no rush. Still on for the offsite on the 20th? I'll ping legal myself. And push the Mysa call to next week.
+>>>`;
+const EXAMPLE_OUT_2 = JSON.stringify({ items: [
+  { text: "someday we should redo the website, no rush", owner: "me", kind: "task", title: "Redo the website", due_text: "", due: "", urgency: "someday", project: "", notes: "No rush", same_as_id: "", confidence: 0.8 },
+  { text: "still on for the offsite on the 20th?", owner: "me", kind: "question", title: "Confirm the offsite on the 20th", due_text: "the 20th", due: "", urgency: "soon", project: "", notes: "", same_as_id: "", confidence: 0.75 },
+  { text: "I'll ping legal myself", owner: "someone_else", kind: "task", title: "Ping legal", due_text: "", due: "", urgency: "soon", project: "", notes: "", same_as_id: "", confidence: 0.9 },
+  { text: "push the Mysa call to next week", owner: "me", kind: "task", title: "Call Mysa about the RFP", due_text: "next week", due: "", urgency: "soon", project: "Sales", notes: "", same_as_id: "abc", confidence: 0.9 }
+] });
+
+// Keep the prompt bounded. With a long list, send the open tasks most related
+// to the pasted text first, then the newest, up to a cap, so the context
+// window is never overrun.
+export function relevantOpen(open, text, limit = 50) {
+  if (open.length <= limit) return open;
+  const want = new Set(tokens(text));
+  const scored = open.map((o) => ({ o, s: tokens(o.title).filter((w) => want.has(w)).length }));
+  scored.sort((a, b) => b.s - a.s || (b.o.createdAt || "").localeCompare(a.o.createdAt || ""));
+  return scored.slice(0, limit).map((x) => x.o);
+}
+
+function buildMessages(text, openList, projects, today) {
+  const user = `EXISTING OPEN TASKS: ${JSON.stringify(openList)}
+PROJECTS: ${JSON.stringify(projects)}
+TEXT:
+<<<
+${text}
+>>>`;
+  return [
+    { role: "system", content: SYSTEM_PROMPT(today) },
+    { role: "user", content: EXAMPLE_IN_1 },
+    { role: "assistant", content: EXAMPLE_OUT_1 },
+    { role: "user", content: EXAMPLE_IN_2 },
+    { role: "assistant", content: EXAMPLE_OUT_2 },
+    { role: "user", content: user }
+  ];
+}
+
+// Turn labeled items into new tasks, updates, and a skipped list with reasons.
+export function postProcess(items, open, today) {
+  const news = [], updates = [], skipped = [];
+  const byId = new Map(open.map((x) => [x.id, x]));
+  const seenTitles = [];
+  (Array.isArray(items) ? items : []).forEach((it) => {
+    if (!it || typeof it !== "object") return;
+    const title = cleanTitle(it.title) || cleanTitle(it.text);
+    if (!title) return;
+    const conf = clamp01(it.confidence);
+    const src = String(it.text || "").slice(0, 140);
+    const reason = (why) => skipped.push({ title, why, src, it });
+    if (it.owner === "someone_else") return reason("someone else's task");
+    if (it.kind === "fyi") return reason("just info");
+    if (it.kind === "marketing") return reason("promo or newsletter");
+    if (it.kind === "other") return reason("not a task");
+    // dates: trust the phrase + our resolver first. Only fall back to the
+    // model's own guess when it also found a phrase, so it can never stamp an
+    // invented date on something that had none.
+    let due = resolveDue(it.due_text, today);
+    if (!due) due = resolveDue(src, today);
+    if (!due && typeof it.due_text === "string" && it.due_text.trim() && isDateStr(it.due)) {
+      const d = parseYMD(it.due), t = parseYMD(today);
+      const diff = (d - t) / 86400000;
+      if (diff >= -30 && diff <= 400) due = it.due;
+    }
+    const holding = it.urgency === "someday" || it.urgency === "waiting";
+    const project = typeof it.project === "string" && it.project.trim() ? it.project.trim() : null;
+    const notes = typeof it.notes === "string" ? it.notes.trim().slice(0, 160) : "";
+    // update to an existing task?
+    const sid = typeof it.same_as_id === "string" ? it.same_as_id.trim() : "";
+    if (sid && byId.has(sid)) {
+      const target = byId.get(sid);
+      const changes = {};
+      if (due && due !== target.due) changes.due = due;
+      if (holding !== !!target.holding && (it.urgency === "someday" || it.urgency === "waiting" || it.urgency === "now")) changes.holding = holding;
+      if (project && project !== target.project) changes.project = project;
+      if (notes && notes !== target.notes) changes.notes = notes;
+      if (Object.keys(changes).length) updates.push({ id: sid, target, changes, checked: true });
+      else reason("already have this");
+      return;
+    }
+    // near duplicate of something open?
+    let best = null, bestS = 0;
+    open.forEach((o) => { const s = similarity(title, o.title); if (s > bestS) { bestS = s; best = o; } });
+    if (best && bestS >= 0.75) {
+      if (due && due !== best.due) { updates.push({ id: best.id, target: best, changes: { due }, checked: true }); return; }
+      return reason("already have this");
+    }
+    // duplicate inside this batch?
+    if (seenTitles.some((s) => similarity(title, s) >= 0.8)) return reason("repeated in the text");
+    seenTitles.push(title);
+    news.push({
+      title, project, notes, due: due || today, holding,
+      checked: conf >= 0.5 && it.owner === "me",
+      confidence: conf, owner: it.owner, kind: it.kind,
+      similarTo: best && bestS >= 0.45 ? best.title : null,
+      src
+    });
+  });
+  return { news, updates, skipped };
+}
+
+// ---------- model catalog curation ----------
+const TIERS = [
+  { key: "laptop", label: "Best on a laptop or desktop", blurb: "8B class. Sharpest at judging whose task it is and what can wait. About 5 to 6 GB. Needs a recent laptop or desktop GPU.",
+    patterns: [/Qwen3\.5-9B/i, /granite-?4/i, /Qwen3-8B/i, /Llama-3\.1-8B-Instruct/i, /Hermes-3-Llama-3\.1-8B/i, /Qwen2\.5-7B-Instruct/i, /gemma-?3-?12b/i] },
+  { key: "balanced", label: "Balanced", blurb: "3 to 4B. Good accuracy, lighter download, fine on most laptops.",
+    patterns: [/Qwen3-4B/i, /Llama-3\.2-3B-Instruct/i, /Qwen2\.5-3B-Instruct/i, /Phi-3\.5-mini/i, /gemma-2-2b/i] },
+  { key: "light", label: "Phones and light devices", blurb: "Under 2B. Fast and small. Expect to fix more in review.",
+    patterns: [/Qwen3-1\.7B/i, /Llama-3\.2-1B-Instruct/i, /Qwen2\.5-1\.5B-Instruct/i, /SmolLM2-1\.7B/i, /Qwen3-0\.6B/i] }
+];
+function pickFromCatalog(list, pattern) {
+  // 1k-context builds cannot hold hana's prompt, so they are never recommended
+  const c = list.filter((m) => pattern.test(m.model_id) && !/-1k($|-)/i.test(m.model_id));
+  if (!c.length) return null;
+  return c.find((m) => /q4f16_1/i.test(m.model_id)) || c[0];
+}
+function buildTiers(list) {
+  const used = new Set();
+  return TIERS.map((tier) => {
+    const models = [];
+    tier.patterns.forEach((p) => { const m = pickFromCatalog(list, p); if (m && !used.has(m.model_id)) { used.add(m.model_id); models.push(m); } });
+    return { ...tier, models };
+  });
+}
+const friendlyName = (id) => String(id).replace(/-q4f16_1|-q4f32_1|-q0f16|-q0f32|-MLC|-Instruct|-it\b/gi, "").replace(/-1k$/i, " (1k ctx)").replace(/-/g, " ");
+const gb = (mb) => (mb ? `${(mb / 1024).toFixed(1)} GB` : "");
+const fmtBytes = (b) => { if (!b && b !== 0) return ""; if (b > 1e9) return (b / 1e9).toFixed(1) + " GB"; if (b > 1e6) return (b / 1e6).toFixed(0) + " MB"; return Math.round(b / 1e3) + " KB"; };
+const isMobile = () => /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && window.innerWidth < 900);
+
+let webllmMod = null;
+async function loadWebLLM() {
+  if (webllmMod) return webllmMod;
+  webllmMod = await import("./vendor/web-llm.js");
+  return webllmMod;
+}
+
+// ======================================================================
+// App
+// ======================================================================
+function App() {
+  const [tasks, setTasks] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  const [settings, setSettings] = useState({ modelId: "", cleanupOnSwitch: true, welcomeSeen: false, voiceOk: false });
+  const [paste, setPaste] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [busySince, setBusySince] = useState(0);
+  const [tick, setTick] = useState(0);
+  const [review, setReview] = useState(null);
+  const [showSkipped, setShowSkipped] = useState(false);
+  const [filter, setFilter] = useState(null);
+  const [tab, setTab] = useState("active");
+  const [toast, setToast] = useState(null); // {msg, action, label}
+  const [err, setErr] = useState("");
+  const [showPau, setShowPau] = useState(false);
+  const [panel, setPanel] = useState(null); // help | privacy | model | null
+  const [showSplash, setShowSplash] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [editVal, setEditVal] = useState("");
+  const [listening, setListening] = useState(false);
+  // model state
+  const [engineState, setEngineState] = useState({ status: "idle", modelId: "", pct: 0, text: "", error: "" });
+  const [catalog, setCatalog] = useState([]);
+  const [tiers, setTiers] = useState([]);
+  const [choice, setChoice] = useState("");
+  const [cached, setCached] = useState(null); // array of ids or null while checking
+  const [storage, setStorage] = useState(null);
+  const [gpuOk, setGpuOk] = useState(!!navigator.gpu);
+
+  const areaRef = useRef(null);
+  const fileRef = useRef(null);
+  const applyBtnRef = useRef(null);
+  const toastTimer = useRef(null);
+  const engineRef = useRef(null);
+  const appCfgRef = useRef(null);
+  const [localShipped, setLocalShipped] = useState(false);
+  const reqRef = useRef(0);
+  const recogRef = useRef(null);
+  const baseTextRef = useRef("");
+  const finalRef = useRef("");
+  const lastDeleted = useRef(null);
+
+  // ----- toast -----
+  const say = (msg, action, label) => {
+    setToast({ msg, action, label });
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), action ? 6000 : 3200);
+  };
+
+  // ----- persistence -----
+  const persist = (next) => { idbSet(TASKS_KEY, next).catch(() => {}); };
+  const mutate = (next) => {
+    setTasks((prev) => { const v = typeof next === "function" ? next(prev) : next; persist(v); return v; });
+  };
+  const saveSettings = (patch) => {
+    setSettings((prev) => { const v = { ...prev, ...patch }; idbSet(SETTINGS_KEY, v).catch(() => {}); return v; });
+  };
+
+  useEffect(() => {
+    if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
+    if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+    (async () => {
+      let list = [];
+      try { const v = await idbGet(TASKS_KEY); if (Array.isArray(v)) list = v; } catch (e) {}
+      let st = null;
+      try { st = await idbGet(SETTINGS_KEY); } catch (e) {}
+      const t = todayStr();
+      setTasks(list.map((tk) => (isDateStr(tk.due) ? tk : { ...tk, due: t })));
+      if (st && typeof st === "object") setSettings((p) => ({ ...p, ...st }));
+      setLoaded(true);
+      if (!st || !st.welcomeSeen) setShowSplash(true);
+      // engine + catalog
+      try {
+        const w = await loadWebLLM();
+        const shipped = await hasLocalModel();
+        setLocalShipped(shipped);
+        appCfgRef.current = appConfigFor(w, shipped);
+        const list2 = appCfgRef.current.model_list || [];
+        setCatalog(list2);
+        const tr = buildTiers(list2);
+        setTiers(tr);
+        const saved = st && st.modelId && list2.some((m) => m.model_id === st.modelId) ? st.modelId : "";
+        const suggestedTier = isMobile() ? "light" : "laptop";
+        const first = (tr.find((x) => x.key === suggestedTier) || tr[0] || { models: [] }).models[0] || tr.flatMap((x) => x.models)[0];
+        setChoice(saved || (shipped ? LOCAL_MODEL_ID : first ? first.model_id : ""));
+        if (saved) loadModel(saved, w);
+      } catch (e) {
+        setEngineState({ status: "error", modelId: "", pct: 0, text: "", error: "Could not load the WebLLM engine. Check your connection for the first run." });
+      }
+    })();
+  }, []);
+
+  // ----- model loading -----
+  const loadModel = async (modelId, wPre) => {
+    const w = wPre || await loadWebLLM();
+    if (!navigator.gpu) { setGpuOk(false); setEngineState({ status: "error", modelId, pct: 0, text: "", error: "This browser has no WebGPU. Use Chrome or Edge on a laptop or desktop, or Safari on a recent Mac." }); return; }
+    const prev = engineState.modelId;
+    setEngineState({ status: "loading", modelId, pct: 0, text: "Starting", error: "" });
+    try {
+      if (!appCfgRef.current) appCfgRef.current = appConfigFor(w, await hasLocalModel());
+      const cfg = appCfgRef.current;
+      if (!engineRef.current) {
+        engineRef.current = new w.MLCEngine({ appConfig: cfg, initProgressCallback: (r) => setEngineState((s) => ({ ...s, status: "loading", pct: Math.round((r.progress || 0) * 100), text: r.text || "" })) });
+      } else {
+        engineRef.current.setInitProgressCallback((r) => setEngineState((s) => ({ ...s, status: "loading", pct: Math.round((r.progress || 0) * 100), text: r.text || "" })));
+      }
+      await engineRef.current.reload(modelId);
+      setEngineState({ status: "ready", modelId, pct: 100, text: "", error: "" });
+      saveSettings({ modelId });
+      say(`${friendlyName(modelId)} is ready`);
+      if (prev && prev !== modelId && settings.cleanupOnSwitch) {
+        try { await w.deleteModelAllInfoInCache(prev, cfg); say(`Removed ${friendlyName(prev)} to free space`); } catch (e) {}
+        refreshStorage(w);
+      }
+    } catch (e) {
+      const msg = String(e && e.message ? e.message : e);
+      const oom = /memory|OOM|buffer|limit|allocation/i.test(msg);
+      setEngineState({ status: "error", modelId, pct: 0, text: "", error: oom ? "That model did not fit in this device's memory. Try a smaller tier." : "Could not load the model. " + msg.slice(0, 160) });
+    }
+  };
+
+  const refreshStorage = async (wPre) => {
+    try { const est = await navigator.storage.estimate(); setStorage(est); } catch (e) { setStorage(null); }
+    try {
+      const w = wPre || await loadWebLLM();
+      const cfg = appCfgRef.current || w.prebuiltAppConfig;
+      setCached(null);
+      const ids = [];
+      for (const m of catalog.length ? catalog : (cfg.model_list || [])) {
+        try { if (await w.hasModelInCache(m.model_id, cfg)) ids.push(m.model_id); } catch (e) {}
+      }
+      setCached(ids);
+    } catch (e) { setCached([]); }
+  };
+  useEffect(() => { if (panel === "model") refreshStorage(); }, [panel]);
+
+  const removeCached = async (id) => {
+    try { const w = await loadWebLLM(); await w.deleteModelAllInfoInCache(id, appCfgRef.current || w.prebuiltAppConfig); say(`Removed ${friendlyName(id)}`); } catch (e) { say("Couldn't remove that model"); }
+    refreshStorage();
+  };
+  const removeAllOthers = async () => {
+    if (!cached) return;
+    const w = await loadWebLLM();
+    const cfg = appCfgRef.current || w.prebuiltAppConfig;
+    let n = 0;
+    for (const id of cached) { if (id !== engineState.modelId) { try { await w.deleteModelAllInfoInCache(id, cfg); n++; } catch (e) {} } }
+    say(n ? `Removed ${n} model${n === 1 ? "" : "s"}` : "Nothing to remove");
+    refreshStorage();
+  };
+
+  // ----- derived -----
+  const open = useMemo(() => tasks.filter((t) => !t.done), [tasks]);
+  const activeOpen = useMemo(() => open.filter((t) => !t.holding), [open]);
+  const heldOpen = useMemo(() => open.filter((t) => t.holding), [open]);
+  const pau = useMemo(() => tasks.filter((t) => t.done).sort((a, b) => (b.completedAt || "").localeCompare(a.completedAt || "")), [tasks]);
+  const projects = useMemo(() => { const s = new Set(); tasks.forEach((t) => t.project && s.add(t.project)); return Array.from(s).sort(); }, [tasks]);
+  const tabOpen = tab === "holding" ? heldOpen : activeOpen;
+  const visible = useMemo(() => tabOpen.filter((t) => (filter ? t.project === filter : true)), [tabOpen, filter]);
+  const buckets = useMemo(() => {
+    const t = todayStr(), tm = addDays(t, 1), wk = addDays(t, 7);
+    const sorted = [...visible].sort((a, b) => a.due.localeCompare(b.due) || (a.createdAt || "").localeCompare(b.createdAt || ""));
+    return [
+      { label: "Late", items: sorted.filter((x) => x.due < t) },
+      { label: "Today", items: sorted.filter((x) => x.due === t) },
+      { label: "Tomorrow", items: sorted.filter((x) => x.due === tm) },
+      { label: "This week", items: sorted.filter((x) => x.due > tm && x.due <= wk) },
+      { label: "Later", items: sorted.filter((x) => x.due > wk) }
+    ].filter((b) => b.items.length);
+  }, [visible]);
+
+  // ----- extraction -----
+  const extract = async () => {
+    const text = paste.trim();
+    if (!text || busy) return;
+    if (engineState.status !== "ready" || !engineRef.current) { setPanel("model"); say("Pick and load a model first, or use Add as is"); return; }
+    setBusy(true); setBusySince(Date.now()); setErr(""); setReview(null); setShowSkipped(false);
+    const myReq = ++reqRef.current;
+    const t = todayStr();
+    const openList = relevantOpen(open, text).map(({ id, title, project, due, holding }) => ({ id, title, project, due, holding: !!holding }));
+    try {
+      const messages = buildMessages(text, openList, projects, t);
+      const r = await engineRef.current.chat.completions.create({
+        messages, temperature: 0.1, max_tokens: 1400,
+        response_format: { type: "json_object", schema: JSON.stringify(SCHEMA) },
+        extra_body: { enable_thinking: false }
+      });
+      if (myReq !== reqRef.current) return; // cancelled
+      const raw = (r.choices && r.choices[0] && r.choices[0].message && r.choices[0].message.content) || "";
+      const s = raw.indexOf("{"), e = raw.lastIndexOf("}");
+      if (s === -1 || e === -1) throw new Error("no json");
+      const parsed = JSON.parse(raw.slice(s, e + 1));
+      const result = postProcess(parsed.items, open, t);
+      setReview(result);
+      if (result.news.length || result.updates.length) setTimeout(() => applyBtnRef.current && applyBtnRef.current.focus({ preventScroll: true }), 0);
+    } catch (e2) {
+      if (myReq !== reqRef.current) return;
+      setErr("Couldn't finish reading that. Try again, paste a smaller chunk, or add it as one task.");
+    } finally {
+      if (myReq === reqRef.current) setBusy(false);
+    }
+  };
+  const cancelExtract = () => {
+    reqRef.current++;
+    try { engineRef.current && engineRef.current.interruptGenerate(); } catch (e) {}
+    setBusy(false);
+    say("Stopped");
+  };
+  useEffect(() => { if (!busy) return; const id = setInterval(() => setTick((x) => x + 1), 500); return () => clearInterval(id); }, [busy]);
+  const busySecs = busy ? Math.floor((Date.now() - busySince) / 1000) : 0;
+
+  const applyReview = () => {
+    if (!review) return;
+    const t = todayStr(), now = new Date().toISOString();
+    const chosenNew = review.news
+      .filter((n) => n.checked && typeof n.title === "string" && n.title.trim())
+      .map((n) => ({ id: uid(), title: n.title.trim(), project: typeof n.project === "string" && n.project.trim() ? n.project.trim() : null, notes: n.notes || "", due: isDateStr(n.due) ? n.due : t, holding: !!n.holding, done: false, createdAt: now, completedAt: null }));
+    const chosenUpdates = new Map(review.updates.filter((u) => u.checked).map((u) => [u.id, u.changes]));
+    const next = tasks.map((tk) => (chosenUpdates.has(tk.id) ? { ...tk, ...chosenUpdates.get(tk.id) } : tk));
+    mutate([...next, ...chosenNew]);
+    setReview(null); setPaste("");
+    if (areaRef.current) areaRef.current.style.height = "auto";
+    const parts = [];
+    if (chosenNew.length) parts.push(`Added ${chosenNew.length}`);
+    if (chosenUpdates.size) parts.push(`updated ${chosenUpdates.size}`);
+    say(parts.length ? parts.join(" · ") : "Nothing added");
+  };
+
+  // Manual add: bypass the model entirely. One line becomes one task; several
+  // lines become several tasks. A date phrase at the end still gets resolved.
+  const addAsIs = () => {
+    const text = paste.trim();
+    if (!text) return;
+    if (busy) cancelExtract();
+    const t = todayStr(), now = new Date().toISOString();
+    const lines = text.split(/\n+/).map((l) => l.replace(/^[\s\-*•\d.)]+/, "").trim()).filter(Boolean);
+    const made = lines.map((line) => {
+      const due = resolveDue(line, t) || t;
+      let title = line;
+      if (title.length > 90) title = title.slice(0, 87) + "...";
+      return { id: uid(), title: cleanTitle(title), project: null, notes: "", due, holding: tab === "holding", done: false, createdAt: now, completedAt: null };
+    });
+    mutate([...tasks, ...made]);
+    setPaste(""); setErr(""); setReview(null);
+    if (areaRef.current) areaRef.current.style.height = "auto";
+    say(`Added ${made.length} task${made.length === 1 ? "" : "s"}`);
+  };
+
+  // ----- task actions -----
+  const toggleDone = (id) => { const now = new Date().toISOString(); mutate((prev) => prev.map((tk) => (tk.id === id ? { ...tk, done: !tk.done, completedAt: tk.done ? null : now } : tk))); };
+  const removeTask = (id) => {
+    mutate((prev) => {
+      const idx = prev.findIndex((tk) => tk.id === id);
+      if (idx === -1) return prev;
+      lastDeleted.current = { items: [prev[idx]] };
+      return prev.filter((tk) => tk.id !== id);
+    });
+    say("Deleted", undoDelete, "Undo");
+  };
+  const undoDelete = () => {
+    const d = lastDeleted.current; if (!d) return;
+    mutate((prev) => [...prev, ...d.items.filter((x) => !prev.some((p) => p.id === x.id))]);
+    lastDeleted.current = null; setToast(null);
+  };
+  const setField = (id, field, value) => mutate((prev) => prev.map((tk) => (tk.id === id ? { ...tk, [field]: value } : tk)));
+  const moveHolding = (id, toHolding) => { mutate((prev) => prev.map((tk) => (tk.id === id ? { ...tk, holding: toHolding } : tk))); say(toHolding ? "Moved to Holding Tank" : "Moved to Active"); };
+  const clearPau = () => {
+    mutate((prev) => { lastDeleted.current = { items: prev.filter((tk) => tk.done) }; return prev.filter((tk) => !tk.done); });
+    say("Cleared pau", undoDelete, "Undo"); setShowPau(false);
+  };
+
+  // ----- export / import (same file format as hana, so they interchange) -----
+  const exportData = () => {
+    if (!tasks.length) { say("Nothing to export yet"); return; }
+    const payload = JSON.stringify({ app: "hana", source: "hana-local", exportedAt: new Date().toISOString(), tasks }, null, 2);
+    const blob = new Blob([payload], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a"); a.href = url; a.download = `hana-backup-${todayStr()}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+    say(`Exported ${tasks.length} ${tasks.length === 1 ? "task" : "tasks"}`);
+  };
+  const importData = async (e) => {
+    const file = e.target.files && e.target.files[0]; e.target.value = "";
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text());
+      const incoming = Array.isArray(parsed) ? parsed : Array.isArray(parsed.tasks) ? parsed.tasks : null;
+      if (!incoming) throw new Error("bad file");
+      const t = todayStr();
+      const prevById = new Map(tasks.map((tk) => [tk.id, tk]));
+      const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+      const build = (x) => {
+        const id = typeof x.id === "string" && x.id ? x.id : uid();
+        const prev = prevById.get(id);
+        const done = has(x, "done") ? !!x.done : !!(prev && prev.done);
+        const holding = has(x, "holding") ? x.holding === true : !!(prev && prev.holding);
+        const due = isDateStr(x.due) ? x.due : prev && isDateStr(prev.due) ? prev.due : t;
+        return { id, title: x.title.trim(), project: typeof x.project === "string" && x.project.trim() ? x.project.trim() : prev ? prev.project : null, notes: typeof x.notes === "string" ? x.notes : prev ? prev.notes : "", due, holding, done,
+          createdAt: typeof x.createdAt === "string" ? x.createdAt : prev && prev.createdAt ? prev.createdAt : new Date().toISOString(),
+          completedAt: done ? (typeof x.completedAt === "string" ? x.completedAt : prev && prev.completedAt ? prev.completedAt : new Date().toISOString()) : null };
+      };
+      const builtById = new Map();
+      incoming.filter((x) => x && typeof x.title === "string" && x.title.trim()).forEach((x) => { const b = build(x); builtById.set(b.id, b); });
+      let updated = 0;
+      const next = tasks.map((tk) => { if (builtById.has(tk.id)) { updated++; return builtById.get(tk.id); } return tk; });
+      const brandNew = []; builtById.forEach((b, id) => { if (!prevById.has(id)) brandNew.push(b); });
+      if (!brandNew.length && !updated) { say("Nothing to import"); return; }
+      mutate([...next, ...brandNew]);
+      const parts = []; if (brandNew.length) parts.push(`Imported ${brandNew.length}`); if (updated) parts.push(`updated ${updated}`);
+      say(parts.join(" · "));
+    } catch (e2) { say("Couldn't read that file"); }
+  };
+
+  // ----- inline editing -----
+  const startEdit = (id, field, current) => { setEditing({ id, field }); setEditVal(current || ""); };
+  const commitEdit = () => {
+    if (!editing) return;
+    const v = editVal.trim();
+    if (editing.field === "title") { if (v) setField(editing.id, "title", v); }
+    else if (editing.field === "project") setField(editing.id, "project", v || null);
+    setEditing(null);
+  };
+
+  // ----- voice (browser dictation) -----
+  const speechSupport = typeof window !== "undefined" && !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+  const growArea = () => { const el = areaRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 320) + "px"; };
+  const stopDictation = () => { const r = recogRef.current; if (r) { try { r.stop(); } catch (e) {} } };
+  const startDictation = () => {
+    if (!speechSupport) { say("This browser has no dictation. Use your system's dictation into the box."); return; }
+    if (!settings.voiceOk) { setPanel("privacy"); say("Read the voice note, then turn voice on"); return; }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const r = new SR(); r.lang = navigator.language || "en-US"; r.continuous = true; r.interimResults = true;
+    const prev = paste.replace(/\s+$/, ""); baseTextRef.current = prev ? prev + " " : ""; finalRef.current = "";
+    r.onresult = (e) => {
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) { const res = e.results[i]; if (res.isFinal) finalRef.current += res[0].transcript; else interim += res[0].transcript; }
+      setPaste(baseTextRef.current + finalRef.current + interim); growArea();
+    };
+    r.onerror = (ev) => { if (ev.error === "not-allowed" || ev.error === "service-not-allowed") say("Microphone is blocked. Allow mic access to dictate."); else if (ev.error !== "aborted" && ev.error !== "no-speech") say("Voice stopped"); };
+    r.onend = () => { setListening(false); recogRef.current = null; setPaste((p) => p.replace(/[ ]+$/, "")); growArea(); };
+    recogRef.current = r;
+    try { r.start(); setListening(true); say("Listening, speak your task"); } catch (e) { setListening(false); }
+  };
+  const toggleDictation = () => { if (listening) stopDictation(); else startDictation(); };
+  useEffect(() => () => { const r = recogRef.current; if (r) { try { r.stop(); } catch (e) {} } }, []);
+
+  // ----- keyboard shortcuts -----
+  const reviewKey = (e) => { if (e.key === "Enter") { e.preventDefault(); applyReview(); } };
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = (e.target && e.target.tagName) || "";
+      const typing = tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || (e.target && e.target.isContentEditable);
+      const mod = e.metaKey || e.ctrlKey;
+      if (e.key === "Escape") {
+        if (listening) { stopDictation(); return; }
+        if (panel) { setPanel(null); return; }
+        if (editing) { setEditing(null); return; }
+        if (busy) { cancelExtract(); return; }
+        return;
+      }
+      if (mod && e.shiftKey && e.key === "Enter") { e.preventDefault(); addAsIs(); return; }
+      if (mod && e.shiftKey && (e.key === "m" || e.key === "M")) { e.preventDefault(); toggleDictation(); return; }
+      if (mod && (e.key === "k" || e.key === "K")) { e.preventDefault(); setPanel(panel === "model" ? null : "model"); return; }
+      if (typing || mod || e.altKey) return;
+      if (e.key === "/") { e.preventDefault(); setPanel(null); areaRef.current && areaRef.current.focus(); return; }
+      if (e.key === "1") { setTab("active"); return; }
+      if (e.key === "2") { setTab("holding"); return; }
+      if (e.key === "?") { setPanel(panel === "help" ? null : "help"); return; }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [listening, panel, editing, busy, paste, tab, tasks, engineState]);
+
+  const onPasteChange = (e) => { setPaste(e.target.value); growArea(); };
+  const openCount = open.length;
+
+  // ======================================================================
+  // render pieces
+  // ======================================================================
+  const Circle = ({ done, onClick, label }) => html`
+    <button class=${"circle" + (done ? " done" : "")} onClick=${onClick} aria-label=${label}>
+      ${done && html`<svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2.5 6.5L5 9L9.5 3.5" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" /></svg>`}
+    </button>`;
+
+  const Row = ({ t }) => {
+    const isEditTitle = editing && editing.id === t.id && editing.field === "title";
+    const isEditProject = editing && editing.id === t.id && editing.field === "project";
+    const isEditDue = editing && editing.id === t.id && editing.field === "due";
+    const late = !t.done && isDateStr(t.due) && t.due < todayStr();
+    return html`
+      <div class=${"trow" + (late ? " late" : "")}>
+        <${Circle} done=${t.done} onClick=${() => toggleDone(t.id)} label=${t.done ? "Mark not done" : "Mark done"} />
+        <div style="flex:1; min-width:0;">
+          ${isEditTitle ? html`
+            <input class="field" style="width:100%; font-size:15px;" value=${editVal} onInput=${(e) => setEditVal(e.target.value)} onBlur=${commitEdit}
+              onKeyDown=${(e) => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") setEditing(null); }} ref=${(el) => el && el.focus()} />
+          ` : html`
+            <div class=${"title" + (t.done ? " done" : "")} onClick=${() => !t.done && startEdit(t.id, "title", t.title)} title=${t.done ? undefined : "Click to edit"}>${t.title}</div>
+          `}
+          ${t.notes ? html`<div class="notes">${t.notes}</div>` : null}
+          <div class="meta">
+            ${!t.done && (isEditDue ? html`
+              <input type="date" class="field mono" style="font-size:12px;" value=${t.due}
+                onInput=${(e) => { if (isDateStr(e.target.value)) setField(t.id, "due", e.target.value); }} onBlur=${() => setEditing(null)} ref=${(el) => el && el.focus()} />
+            ` : html`
+              <button class=${"datepill" + (late ? " late" : t.due === todayStr() ? " today" : "")} onClick=${() => setEditing({ id: t.id, field: "due" })} title="Change date">${displayDate(t.due)}</button>
+            `)}
+            ${isEditProject ? html`
+              <input class="field" list="hana-projects" style="font-size:12px; width:120px;" value=${editVal} onInput=${(e) => setEditVal(e.target.value)} onBlur=${commitEdit}
+                onKeyDown=${(e) => { if (e.key === "Enter") commitEdit(); if (e.key === "Escape") setEditing(null); }} placeholder="project" ref=${(el) => el && el.focus()} />
+            ` : html`
+              <button class=${"projchip" + (t.project ? " set" : "")} onClick=${() => !t.done && startEdit(t.id, "project", t.project)} title=${t.project ? "Change project" : "Add to a project"}>${t.project || "+ project"}</button>
+            `}
+            ${!t.done && html`<button class="movechip" onClick=${() => moveHolding(t.id, !t.holding)} title=${t.holding ? "Move back to Active" : "Move to Holding Tank"}>${t.holding ? "← Active" : "→ Tank"}</button>`}
+          </div>
         </div>
-      </div>
+        <button class="x" onClick=${() => removeTask(t.id)} aria-label="Delete task" title="Delete">×</button>
+      </div>`;
+  };
 
-      <!-- model bar -->
-      <div id="modelBar" class="model-bar">
-        <div class="model-line">
-          <span id="modelBadge" class="model-badge">checking device…</span>
-          <label class="model-pick">
-            <span class="visually-hidden">Model</span>
-            <select id="modelSelect" aria-label="Model choice"></select>
+  const badgeClass = engineState.status === "ready" ? (busy ? "busy" : "ready") : engineState.status;
+  const badgeText = !gpuOk ? "no WebGPU" : engineState.status === "ready" ? (busy ? `reading · ${busySecs}s` : `local · ${friendlyName(engineState.modelId)}`) : engineState.status === "loading" ? `loading ${engineState.pct}%` : engineState.status === "error" ? "model error" : "no model loaded";
+
+  const ModelBadge = () => html`
+    <button class=${"badge " + badgeClass} onClick=${() => setPanel("model")} title="Model and storage (⌘K)" style="cursor:pointer;">
+      <span class="dot"></span><span style="overflow:hidden; text-overflow:ellipsis;">${badgeText}</span>
+    </button>`;
+
+  // ----- panels -----
+  const ModelPanel = () => {
+    const cachedSet = new Set(cached || []);
+    const catalogSorted = [...catalog].sort((a, b) => (a.vram_required_MB || 0) - (b.vram_required_MB || 0));
+    return html`
+      <div class="card">
+        <div class="serif" style="font-size:21px; margin-bottom:6px;">Model and storage</div>
+        <p class="para small">Everything runs on this device. The model downloads once, then it works offline.</p>
+        ${!gpuOk && html`<div class="alert">This browser has no WebGPU, which the model needs. Use Chrome or Edge on a laptop or desktop, or Safari on a recent Mac. Add as is still works without a model.</div>`}
+        <div class="eyebrow">Status</div>
+        <div class="row gap2 wrapflex"><${ModelBadge} /></div>
+        ${engineState.status === "loading" && html`
+          <div style="margin-top:8px;"><div class="progress"><div style=${{ width: engineState.pct + "%" }}></div></div>
+          <div class="small mono" style="margin-top:4px;">${engineState.text}</div></div>`}
+        ${engineState.status === "error" && html`<div class="alert">${engineState.error}</div>`}
+
+        <div class="eyebrow">Choose a model</div>
+        <p class="para small">Recommended picks from the WebLLM catalog, best first. Newer models show up here automatically when WebLLM adds them.</p>
+        ${tiers.map((tier) => html`
+          <div key=${tier.key} style="margin-top:10px;">
+            <div style="font-weight:500; font-size:13.5px;">${tier.label}</div>
+            <div class="small">${tier.blurb}</div>
+            ${tier.models.length ? tier.models.map((m) => html`
+              <label class="mrow" key=${m.model_id} style="cursor:pointer;">
+                <input type="radio" name="model" checked=${choice === m.model_id} onChange=${() => setChoice(m.model_id)} />
+                <div style="flex:1; min-width:0;">
+                  <div class="mname">${friendlyName(m.model_id)} ${localShipped && m.model_id === LOCAL_MODEL_ID ? html`<span class="tag tank">included, no download</span>` : null} ${cachedSet.has(m.model_id) ? html`<span class="tag">downloaded</span>` : null} ${engineState.modelId === m.model_id ? html`<span class="tag tank">loaded</span>` : null}</div>
+                  <div class="msub mono">${gb(m.vram_required_MB)} ${m.low_resource_required ? "· low memory ok" : ""}</div>
+                </div>
+              </label>`) : html`<div class="small" style="padding:6px 0;">None in this tier in the current catalog.</div>`}
+          </div>`)}
+        ${catalog.length ? html`
+          <details style="margin-top:10px;">
+            <summary class="small" style="cursor:pointer;">All ${catalog.length} models in the catalog</summary>
+            <select class="field" style="margin-top:8px; width:100%;" value=${choice} onChange=${(e) => setChoice(e.target.value)}>
+              ${catalogSorted.map((m) => html`<option value=${m.model_id} key=${m.model_id}>${friendlyName(m.model_id)} · ${gb(m.vram_required_MB)}${cachedSet.has(m.model_id) ? " · downloaded" : ""}</option>`)}
+            </select>
+          </details>` : html`<div class="small" style="margin-top:8px;">Loading the catalog…</div>`}
+        <div class="row gap2 wrapflex" style="margin-top:14px;">
+          <button class="primary" disabled=${!choice || engineState.status === "loading" || (engineState.status === "ready" && engineState.modelId === choice)} onClick=${() => loadModel(choice)}>
+            ${engineState.status === "ready" && engineState.modelId && engineState.modelId !== choice ? "Switch to this model" : cachedSet.has(choice) ? "Load model" : "Download and load"}
+          </button>
+          <label class="small row gap2" style="cursor:pointer;">
+            <input type="checkbox" checked=${settings.cleanupOnSwitch} onChange=${(e) => saveSettings({ cleanupOnSwitch: e.target.checked })} style="accent-color:var(--accent);" />
+            free space from the old model after switching
           </label>
         </div>
-        <div id="modelProgressWrap" class="progress-wrap" hidden>
-          <div class="progress-track"><div id="modelProgressBar" class="progress-bar"></div></div>
-          <div id="modelProgressText" class="progress-text"></div>
+
+        <div class="eyebrow">Storage</div>
+        ${storage ? html`<div class="small mono">Using ${fmtBytes(storage.usage)} of about ${fmtBytes(storage.quota)} the browser allows this site.</div>` : null}
+        ${cached === null ? html`<div class="small" style="margin-top:6px;">Checking what is downloaded…</div>` :
+          cached.length === 0 ? html`<div class="small" style="margin-top:6px;">No models downloaded yet.</div>` :
+          html`<div style="margin-top:6px;">
+            ${cached.map((id) => { const m = catalog.find((x) => x.model_id === id); return html`
+              <div class="row between gap2" key=${id} style="padding:6px 0; border-bottom:1px solid var(--line);">
+                <div style="min-width:0;"><div style="font-size:13.5px;">${friendlyName(id)} ${engineState.modelId === id ? html`<span class="tag tank">loaded</span>` : null}</div><div class="small mono">about ${gb(m && m.vram_required_MB) || "?"}</div></div>
+                <button class="ghost danger" style="padding:4px 10px; font-size:12.5px;" disabled=${engineState.modelId === id} onClick=${() => removeCached(id)}>Remove</button>
+              </div>`; })}
+            ${cached.filter((id) => id !== engineState.modelId).length > 0 && html`<button class="ghost danger" style="margin-top:10px;" onClick=${removeAllOthers}>Remove all except the loaded model</button>`}
+          </div>`}
+        <div class="eyebrow">Tips</div>
+        <p class="para small">If a model fails to load or the page gets slow, pick a smaller tier. On a 16 GB laptop the 8B tier is the sweet spot. Phones should stay in the light tier. Your tasks are stored separately from the models, so removing a model never touches your list.</p>
+      </div>`;
+  };
+
+  const HelpPanel = () => html`
+    <div class="card">
+      <div class="serif" style="font-size:21px; margin-bottom:10px;">How hana local works</div>
+      <p class="para">hana turns whatever you paste into a clean task list. Drop in a full email, meeting notes, or a single line like "call the vet Friday" and press Make tasks. A small model running on your own device reads it. Nothing is sent anywhere.</p>
+      <div class="eyebrow">Adding tasks</div>
+      <p class="para">The model labels every line it finds, then hana keeps only real tasks that are yours. It skips things other people said they would do, newsletters, and plain info, and shows them in a Skipped list so you can rescue any with one tap. Dates like "by Thursday" or "week of the 20th" are worked out by hana itself, not the model, so they land on the right day.</p>
+      <div class="eyebrow">Reviewing what it found</div>
+      <p class="para">Each task waits in a review box. Edit its title, date, or project right there, uncheck anything you don't want, or flip it between Active and Tank. Items the model was unsure about start unchecked. Press Enter to accept everything, or click Add.</p>
+      <div class="eyebrow">Skip the model</div>
+      <p class="para">Press Add as is to turn the text straight into tasks with no model at all, one task per line. It is instant, works with no model loaded, and is the escape hatch if a read is taking too long. You can also press Stop while the model is reading.</p>
+      <div class="eyebrow">Active and the Holding Tank</div>
+      <p class="para">Active is what you are working on now or soon. The Holding Tank is a backlog for someday, on hold, or waiting-on things. Both keep whatever dates you set, and nothing moves on its own. Anything past its date gathers under Late at the top.</p>
+      <div class="eyebrow">Everyday use</div>
+      <p class="para">Tap the circle to finish a task. Finished tasks rest in Pau at the bottom of Active. Tap a title to reword it, tap + project to group it, and use the project chips to filter. Deleting shows an Undo for a few seconds.</p>
+      <div class="eyebrow">Keyboard</div>
+      <div class="shortcuts">
+        <span><span class="kbd">⌘</span> <span class="kbd">↵</span></span><span>Make tasks, or accept the review when it is open</span>
+        <span><span class="kbd">↵</span></span><span>Accept everything in the review</span>
+        <span><span class="kbd">⌘</span> <span class="kbd">⇧</span> <span class="kbd">↵</span></span><span>Add as is, no model</span>
+        <span><span class="kbd">⌘</span> <span class="kbd">⇧</span> <span class="kbd">M</span></span><span>Start or stop voice</span>
+        <span><span class="kbd">⌘</span> <span class="kbd">K</span></span><span>Model and storage</span>
+        <span><span class="kbd">/</span></span><span>Jump to the paste box</span>
+        <span><span class="kbd">1</span> <span class="kbd">2</span></span><span>Active, Holding Tank</span>
+        <span><span class="kbd">?</span></span><span>This help</span>
+        <span><span class="kbd">esc</span></span><span>Close, stop, or cancel</span>
+      </div>
+      <p class="para small" style="margin-top:8px;">On Windows and Linux, use Ctrl where it says ⌘.</p>
+      <div class="eyebrow">Move your data</div>
+      <p class="para">Export saves every task to a file, with dates, projects, and the tank. Import reads it back, adds what is new, and updates matches so their status follows the file. The file format is the same as the Claude version of hana, so you can move between the two.</p>
+      <div class="row gap2 wrapflex" style="margin-top:10px;">
+        <button class="ghost" onClick=${exportData}>Export tasks</button>
+        <button class="ghost" onClick=${() => fileRef.current && fileRef.current.click()}>Import tasks</button>
+        <a class="ghost" style="text-decoration:none; display:inline-block;" href=${UPDATE_PAGE} target="_blank" rel="noopener noreferrer">Other versions of hana</a>
+      </div>
+    </div>`;
+
+  const PrivacyPanel = () => html`
+    <div class="card">
+      <div class="serif" style="font-size:21px; margin-bottom:10px;">Your words never leave this device</div>
+      <p class="para">hana local has no server, no account, no analytics, and no tracking. The model runs here, in your browser, on your machine. Your tasks are stored here too. Nothing is uploaded, and no one, including the person who built hana, can see them or know you use it.</p>
+      <div class="eyebrow">The one honest exception</div>
+      <p class="para">Everything this page loads, the fonts, the interface, and the engine, is served from this same site. The only outside request is the one-time download of a model's weights when you pick one, from a public model host. After that it runs offline. Your text and your tasks are never part of any download or upload. If whoever hosts this copy bundles a model into the site, even that download goes away.</p>
+      <div class="eyebrow">Voice</div>
+      <p class="para">The mic button uses your browser's own dictation. On Chrome and Edge that service sends the audio to Google or Microsoft to transcribe, so it is not fully local. Safari's dictation on recent Apple devices runs on device. For fully local voice, use your system's dictation into the paste box instead, Mac and iPhone dictation stay on device. Voice is off until you turn it on here.</p>
+      <label class="row gap2" style="cursor:pointer; margin-top:8px;">
+        <input type="checkbox" checked=${settings.voiceOk} onChange=${(e) => saveSettings({ voiceOk: e.target.checked })} style="accent-color:var(--accent);" />
+        <span>I understand, turn on the mic button</span>
+      </label>
+      <div class="eyebrow">Proof</div>
+      <p class="para">After the model has downloaded, turn on airplane mode and keep using hana. Everything still works. That is the whole point.</p>
+      <div class="eyebrow">Your data lives in this browser</div>
+      <p class="para">Clearing site data in your browser removes your tasks and the model. Export now and then to keep a backup you hold yourself.</p>
+      <div class="row gap2 wrapflex" style="margin-top:10px;"><button class="ghost" onClick=${exportData}>Export tasks</button></div>
+    </div>`;
+
+  // ----- review tray -----
+  const ReviewTray = () => {
+    if (!review) return null;
+    const total = review.news.length + review.updates.length;
+    const chosen = review.news.filter((x) => x.checked).length + review.updates.filter((x) => x.checked).length;
+    const setN = (i, patch) => setReview((r) => ({ ...r, news: r.news.map((x, j) => (j === i ? { ...x, ...patch } : x)) }));
+    const rescue = (k) => setReview((r) => {
+      const s = r.skipped[k]; const it = s.it || {};
+      const due = resolveDue(it.due_text, todayStr()) || resolveDue(s.src, todayStr()) || todayStr();
+      const n = { title: s.title, project: typeof it.project === "string" && it.project.trim() ? it.project.trim() : null, notes: "", due, holding: it.urgency === "someday" || it.urgency === "waiting", checked: true, confidence: 1, owner: "me", kind: "task", similarTo: null, src: s.src };
+      return { ...r, news: [...r.news, n], skipped: r.skipped.filter((_, j) => j !== k) };
+    });
+    return html`
+      <div class="review">
+        ${total === 0 ? html`
+          <div class="row between gap3 wrapflex">
+            <span style="font-size:14px; color:var(--sub);">No tasks for you in that.${review.skipped.length ? ` Skipped ${review.skipped.length}.` : ""}</span>
+            <div class="row gap2"><button class="ghost" onClick=${addAsIs}>Add as is</button><button class="ghost" onClick=${() => setReview(null)}>OK</button></div>
+          </div>` : html`
+          <div class="eyebrow" style="margin:0 0 6px;">Found ${review.news.length} new${review.updates.length ? ` · ${review.updates.length} update${review.updates.length > 1 ? "s" : ""}` : ""}</div>
+          ${review.news.map((n, i) => html`
+            <div class="ritem" key=${"n" + i}>
+              <input type="checkbox" checked=${n.checked} onChange=${() => setN(i, { checked: !n.checked })} aria-label="Include this task" />
+              <div style="flex:1; min-width:0;">
+                <input class="t" value=${n.title} onInput=${(e) => setN(i, { title: e.target.value })} onKeyDown=${reviewKey} aria-label="Task title" />
+                <div class="meta" style="margin-top:5px;">
+                  <input type="date" class="field mono" style="font-size:11.5px;" value=${isDateStr(n.due) ? n.due : ""} onInput=${(e) => { if (isDateStr(e.target.value)) setN(i, { due: e.target.value }); }} onKeyDown=${reviewKey} aria-label="Due date" />
+                  <input class="field" list="hana-projects" placeholder="+ project" style="font-size:11.5px; width:120px;" value=${n.project || ""} onInput=${(e) => { const v = e.target.value; setN(i, { project: v.trim() ? v : null }); }} onKeyDown=${reviewKey} aria-label="Project" />
+                  <button class=${"projchip" + (n.holding ? " set" : "")} onClick=${() => setN(i, { holding: !n.holding })} title=${n.holding ? "Goes to the Holding Tank" : "Goes to Active"}>${n.holding ? "Tank" : "Active"}</button>
+                  ${n.confidence < 0.5 || n.owner === "unclear" ? html`<span class="tag low" title="The model was not sure this is yours">unsure</span>` : null}
+                  ${n.similarTo ? html`<span class="tag" title=${"Similar to: " + n.similarTo}>similar to “${n.similarTo.slice(0, 28)}${n.similarTo.length > 28 ? "…" : ""}”</span>` : null}
+                </div>
+              </div>
+            </div>`)}
+          ${review.updates.map((u, i) => html`
+            <label class="ritem" key=${"u" + i} style="cursor:pointer;">
+              <input type="checkbox" checked=${u.checked} onChange=${() => setReview((r) => ({ ...r, updates: r.updates.map((x, j) => (j === i ? { ...x, checked: !x.checked } : x)) }))} />
+              <span style="font-size:14.5px; line-height:1.45; color:var(--sub);">Update “${u.target.title}”
+                <span style="color:var(--ink);">${u.changes.due ? ` → ${displayDate(u.changes.due)}` : ""}${u.changes.project ? ` → ${u.changes.project}` : ""}${u.changes.holding !== undefined ? (u.changes.holding ? " → Tank" : " → Active") : ""}${u.changes.notes ? " · note" : ""}</span>
+              </span>
+            </label>`)}
+          <div class="row between gap2 wrapflex" style="margin-top:10px;">
+            <span class="small">${review.skipped.length ? html`<button class="linkbtn" style="color:var(--sub);" onClick=${() => setShowSkipped((s) => !s)}>${showSkipped ? "hide" : "show"} ${review.skipped.length} skipped</button>` : null}</span>
+            <div class="row gap2">
+              <button class="ghost" onClick=${() => setReview(null)}>Discard</button>
+              <button class="primary" ref=${applyBtnRef} onClick=${applyReview}>Add ${chosen}</button>
+            </div>
+          </div>`}
+        ${review.skipped.length > 0 && (showSkipped || total === 0) ? html`
+          <div class="skipped">
+            ${review.skipped.map((s, k) => html`
+              <div class="srow" key=${"s" + k}>
+                <button class="ghost" style="padding:1px 8px; font-size:12px;" onClick=${() => rescue(k)} title="Add this anyway">+</button>
+                <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title=${s.src}>${s.title}</span>
+                <span class="why">${s.why}</span>
+              </div>`)}
+          </div>` : null}
+      </div>`;
+  };
+
+  // ======================================================================
+  // main render
+  // ======================================================================
+  return html`
+    <div>
+      <datalist id="hana-projects">${projects.map((p) => html`<option value=${p} key=${p} />`)}</datalist>
+      <input ref=${fileRef} type="file" accept=".json,application/json" onChange=${importData} style="display:none;" />
+      <div class="wrap">
+        <div class="hdr">
+          <h1 class="serif">hana <span class="mono" style="font-style:normal; font-weight:400; font-size:12px; color:var(--sub); letter-spacing:0; margin-left:4px;">local</span></h1>
+          <div class="links">
+            <button class=${panel === "model" ? "on" : ""} onClick=${() => setPanel(panel === "model" ? null : "model")}>${panel === "model" ? "back to tasks" : "model"}</button>
+            <button class=${panel === "privacy" ? "on" : ""} onClick=${() => setPanel(panel === "privacy" ? null : "privacy")}>${panel === "privacy" ? "back to tasks" : "privacy"}</button>
+            <button class=${panel === "help" ? "on" : ""} onClick=${() => setPanel(panel === "help" ? null : "help")}>${panel === "help" ? "back to tasks" : "help"}</button>
+            <span>${loaded ? `${openCount} open` : "loading"}</span>
+          </div>
         </div>
-        <div id="modelNote" class="model-note"></div>
-      </div>
 
-      <!-- errors: the manual fallback. Whatever went wrong, the user can
-           still land the task by hand, title prefilled from the pool. -->
-      <div id="errBox" class="alert err-box" role="alert" hidden>
-        <span id="errMsg"></span>
-        <div class="manual-add">
-          <input id="manualTitle" class="manual-title" placeholder="Type the task" aria-label="Task title" />
-          <input id="manualDate" type="date" class="manual-date" aria-label="Due date" />
-          <button id="manualAddBtn" class="danger-ghost-btn">Add task</button>
+        ${panel === "model" && html`<${ModelPanel} />`}
+        ${panel === "help" && html`<${HelpPanel} />`}
+        ${panel === "privacy" && html`<${PrivacyPanel} />`}
+
+        ${!panel && html`
+          <div class="row between gap2 wrapflex" style="margin-bottom:8px;"><${ModelBadge} /></div>
+          <div class="pool">
+            <textarea ref=${areaRef} value=${paste} onInput=${onPasteChange} rows="3"
+              onKeyDown=${(e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter" && !e.shiftKey) { e.preventDefault(); if (review) applyReview(); else extract(); } }}
+              placeholder="Paste an email, meeting notes, or just type what needs doing…"></textarea>
+            <div class="row between gap2 wrapflex" style="margin-top:6px;">
+              <div class="row gap2">
+                ${speechSupport && html`<button class=${"mic" + (listening ? " on" : "")} onClick=${toggleDictation} aria-pressed=${listening} aria-label=${listening ? "Stop voice" : "Start voice"} title=${listening ? "Stop (⌘⇧M)" : "Speak (⌘⇧M)"}>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor" /><path d="M5 11a7 7 0 0 0 14 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /><path d="M12 18v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
+                </button>`}
+                <span class="hint">${listening ? "listening… esc to stop" : "⌘↵ make · ⌘⇧↵ add as is"}</span>
+              </div>
+              <div class="row gap2">
+                ${busy ? html`<button class="ghost" onClick=${cancelExtract}>Stop</button>` : html`<button class="ghost" disabled=${!paste.trim()} onClick=${addAsIs} title="Skip the model, one task per line (⌘⇧↵)">Add as is</button>`}
+                <button class="primary" disabled=${!paste.trim() || busy} onClick=${extract}>${busy ? `Reading… ${busySecs}s` : "Make tasks"}</button>
+              </div>
+            </div>
+            ${busy && busySecs >= 8 ? html`<div class="notice">Taking a while. You can keep waiting, press Stop, or use Add as is to add the text straight in without the model.</div>` : null}
+            ${!busy && engineState.status !== "ready" && paste.trim() ? html`<div class="small" style="margin-top:8px;">No model loaded yet. <button class="linkbtn" onClick=${() => setPanel("model")}>Pick one</button> or use Add as is.</div>` : null}
+          </div>
+
+          ${err && html`<div class="alert row between gap3 wrapflex"><span>${err}</span><button class="ghost danger" style="padding:3px 10px; font-size:12.5px;" onClick=${addAsIs}>Add as is</button></div>`}
+          <${ReviewTray} />
+
+          <div class="tabs">
+            ${[{ key: "active", label: "Active", n: activeOpen.length }, { key: "holding", label: "Holding Tank", n: heldOpen.length }].map((tb) => html`
+              <button key=${tb.key} class=${"tab" + (tab === tb.key ? " on" : "")} aria-pressed=${tab === tb.key} onClick=${() => setTab(tb.key)}>${tb.label} · ${tb.n}</button>`)}
+          </div>
+          ${projects.length > 0 && html`
+            <div class="chips">
+              ${[null, ...projects].map((p) => html`<button key=${p || "all"} class=${"chip" + (filter === p ? " on" : "")} onClick=${() => setFilter(p)}>${p || "All"}</button>`)}
+            </div>`}
+
+          ${loaded && visible.length === 0 && !review && html`
+            <div class="empty">${tab === "holding" ? (heldOpen.length === 0 ? "The Holding Tank is empty. Send tasks here with → Tank, or let hana sort them in." : "Nothing in the tank for this project.") : (activeOpen.length === 0 ? "Nothing here yet. Paste anything above and hana will pull out the tasks." : "Nothing open in this project.")}</div>`}
+
+          ${buckets.map((b) => html`
+            <div class=${"bucket" + (b.label === "Late" ? " late" : "")} key=${b.label}>
+              <h3>${b.label} · ${b.items.length}</h3>
+              ${b.items.map((t) => html`<${Row} key=${t.id} t=${t} />`)}
+            </div>`)}
+
+          ${tab === "active" && pau.length > 0 && html`
+            <div style="margin-top:28px;">
+              <div class="row between" style="padding-bottom:6px; border-bottom:1px solid var(--line);">
+                <button onClick=${() => setShowPau((s) => !s)} style="font-size:11px; letter-spacing:0.09em; text-transform:uppercase; color:var(--done); background:none; border:none; padding:0;">${showPau ? "▾" : "▸"} Pau · ${pau.length}</button>
+                ${showPau && html`<button class="linkbtn" style="font-size:12px; color:var(--sub);" onClick=${clearPau}>Clear all</button>`}
+              </div>
+              ${showPau && pau.map((t) => html`<${Row} key=${t.id} t=${t} />`)}
+            </div>`}
+        `}
+
+        <div style="margin-top:36px;" class="center">
+          ${!panel && html`<div class="hint">Paste the mess. Get the list. Nothing leaves this device.</div>`}
+          <div class="hint" style="margin-top:8px;">Free to use · Built with Claude by <a href="https://www.linkedin.com/in/olinlagon/" target="_blank" rel="noopener noreferrer">Olin Lagon</a></div>
+          <div class="hint" style="margin-top:4px;">hana local v${APP_VERSION} · <a href=${SOURCE_URL} target="_blank" rel="noopener noreferrer">Open source · MIT license</a></div>
         </div>
       </div>
 
-      <!-- review tray -->
-      <div id="reviewTray" class="review-tray" hidden></div>
-      </div>
+      ${showSplash && html`
+        <div class="overlay" role="dialog" aria-modal="true" aria-label="Welcome to hana local">
+          <div class="modal">
+            <div class="serif" style="font-size:26px; margin-bottom:4px;">aloha, this is hana local</div>
+            <p style="margin:0; color:var(--sub);">A task manager you can paste anything into. It runs entirely on your device.</p>
+            <div class="eyebrow">Paste, review, done</div>
+            <p class="para">Drop in an email, meeting notes, or one line like "call the vet Friday" and press Make tasks. A small model on your device pulls out the real tasks and shows them for a quick review before anything is added. Add as is skips the model entirely.</p>
+            <div class="eyebrow">Your words never leave this device</div>
+            <p class="para">No server, no account, no tracking. The model runs in your browser and your tasks are stored in your browser. The only download is the model itself, once. After that, airplane mode works.</p>
+            <div class="eyebrow">Dates stay put</div>
+            <p class="para">New tasks land on today unless the text names a day. Dates never move on their own, and anything overdue shows under Late at the top.</p>
+            <div class="eyebrow">Next step</div>
+            <p class="para">Pick a model on the next screen. On a laptop the recommended 8B tier is the sweet spot. On a phone pick the light tier.</p>
+            <button class="primary" style="margin-top:20px; width:100%; padding:10px 18px; font-size:15px;" ref=${(el) => el && el.focus({ preventScroll: true })}
+              onClick=${() => { setShowSplash(false); saveSettings({ welcomeSeen: true }); if (engineState.status !== "ready") setPanel("model"); }}>E hana kākou · let's get to work</button>
+          </div>
+        </div>`}
 
-      <div id="tasksCol">
-      <!-- tabs -->
-      <div class="tabs" role="tablist" aria-label="Task lists">
-        <button id="tabActive" class="tab" role="tab" aria-selected="true">Active · 0</button>
-        <button id="tabHolding" class="tab" role="tab" aria-selected="false">Holding Tank · 0</button>
-      </div>
+      ${toast && html`<div class="toast" role="status"><span>${toast.msg}</span>${toast.action ? html`<button onClick=${toast.action}>${toast.label || "Undo"}</button>` : null}</div>`}
+    </div>`;
+}
 
-      <!-- project chips -->
-      <div id="chips" class="chips" hidden></div>
-
-      <!-- empty message -->
-      <div id="emptyMsg" class="empty" hidden></div>
-
-      <!-- buckets -->
-      <div id="buckets"></div>
-
-      <!-- pau -->
-      <div id="pauSection" class="pau" hidden>
-        <div class="pau-head">
-          <button id="pauToggle" class="pau-toggle">▸ Pau · 0</button>
-          <button id="pauClear" class="pau-clear" hidden>Clear all</button>
-        </div>
-        <div id="pauList"></div>
-      </div>
-      </div>
-    </main>
-
-    <!-- footer -->
-    <footer class="footer">
-      <div id="footTag" class="foot-line">Paste the mess. Get the list. Your tasks never leave this device.</div>
-      <div class="foot-line">Free to use · Built with Claude by
-        <a href="https://www.linkedin.com/in/olinlagon/" target="_blank" rel="noopener noreferrer">Olin Lagon</a>
-      </div>
-      <div class="foot-line"><span id="appVersion"></span> ·
-        <a href="https://github.com/olagon/hana-local" target="_blank" rel="noopener noreferrer">Open source · MIT license</a>
-      </div>
-    </footer>
-  </div>
-
-  <!-- first-run splash -->
-  <div id="splash" class="splash-overlay" role="dialog" aria-modal="true" aria-label="Welcome to hana-local" hidden>
-    <div id="splashCard" class="splash-card">
-      <div class="splash-title">aloha, this is hana-local</div>
-      <p class="splash-sub">A task manager you can paste anything into. Fully private, fully yours.</p>
-      <h3 class="eyebrow">Paste, review, done</h3>
-      <p>Drop in an email, meeting notes, or one line like "call the vet
-      Friday" and press Make tasks. A small AI pulls out the real tasks and
-      shows them for a quick review before anything is added.</p>
-      <h3 class="eyebrow">Dates handle themselves</h3>
-      <p>New tasks land on today unless your text names a deadline. Tap any
-      date to change it. Dates stay put, and anything overdue gathers under a
-      Late heading at the top so it never hides.</p>
-      <h3 class="eyebrow">Your words never leave this device</h3>
-      <p>The model runs here, on your machine. Your tasks are stored here.
-      The text you paste and the tasks it becomes are never uploaded, and no
-      one, including us, can read them. No server, no account. We do count
-      usage with Google Analytics: visits, model choice, and how many tasks
-      get added. Numbers only, never your words. The privacy page has the
-      full story.</p>
-      <h3 class="eyebrow">Nothing to download</h3>
-      <p>The model ships with the app and is loading in the background right
-      now, so it should be ready by the time you finish reading this.</p>
-      <h3 class="eyebrow">Nothing is locked in</h3>
-      <p>Export saves your tasks to a file and Import brings them into
-      another copy. Both live on the privacy page, which also tells the full
-      privacy story.</p>
-      <button id="splashBtn" class="primary-btn splash-btn">E hana kākou · let's get to work</button>
-    </div>
-  </div>
-
-  <!-- toast -->
-  <div id="toast" class="toast" role="status" hidden></div>
-
-  <script type="module" src="app.js"></script>
+render(html`<${App} />`, document.getElementById("app"));
+</script>
 </body>
 </html>

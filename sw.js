@@ -3,7 +3,7 @@
 // (Cache API), so this worker deliberately ignores cross-origin requests —
 // it never adds a network dependency, it only removes them.
 
-const CACHE = "hana-local-shell-v8";
+const CACHE = "hana-local-shell-v9";
 
 const SHELL = [
   "./",

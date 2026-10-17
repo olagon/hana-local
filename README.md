@@ -2,7 +2,7 @@
 
 A task manager you can paste anything into, that runs entirely on your own
 device. Drop in a full email, meeting notes, or a single line like "call the
-vet Friday," press Make tasks, and a small open source model running in your
+vet Friday," press Extract tasks, and a small open source model running in your
 browser pulls out the real tasks for you to review before anything is added.
 
 **Use it:** https://olagon.github.io/hana-local/
@@ -41,9 +41,12 @@ mode after the download and it keeps working.
   so tasks move between the two.
 - **Installable.** A PWA with an offline service worker. Add it to your dock or
   home screen.
-- **Keyboard.** ⌘↵ make tasks, ↵ accept, ⌘⇧↵ add as is, ⌘⇧M voice, ⌘K model
-  panel, / jump to the box, 1 and 2 switch tabs, ? help, esc closes. Ctrl on
-  Windows and Linux.
+- **Settings.** Light, dark, or system theme, the mic switch, auto-clearing
+  finished tasks after 7, 30, or 90 days, how many Pau shows, whether unsure
+  items start checked, and whether the model loads on open or on demand.
+- **Keyboard.** ⌘↵ extract tasks, ↵ accept, ⌘⇧↵ add as is, ⌘⇧M voice, ⌘K model
+  panel, ⌘, settings, / jump to the box, 1 and 2 switch tabs, ? help, esc
+  closes. Ctrl on Windows and Linux.
 
 ## Hardware
 

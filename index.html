@@ -25,7 +25,7 @@
     --toastBg:#22362B; --toastInk:#fff;
   }
   @media (prefers-color-scheme: dark){
-    :root{
+    :root:not([data-theme="light"]){
       --bg:#141A16; --ink:#E6ECE7; --sub:#96A69B; --line:#27332B;
       --pool:#1B231E; --poolBorder:#2E3A32; --card:#192019; --field:#101511;
       --accent:#C9A0BB; --accentDark:#DDB8D1; --accentSoft:#2E2430;
@@ -34,6 +34,25 @@
       --toastBg:#E6ECE7; --toastInk:#141A16;
     }
   }
+  :root[data-theme="dark"]{
+    --bg:#141A16; --ink:#E6ECE7; --sub:#96A69B; --line:#27332B;
+    --pool:#1B231E; --poolBorder:#2E3A32; --card:#192019; --field:#101511;
+    --accent:#C9A0BB; --accentDark:#DDB8D1; --accentSoft:#2E2430;
+    --done:#8CC497; --doneSoft:#1E2E22; --danger:#E09A9A; --dangerSoft:#33201F; --dangerLine:#4A2D2B;
+    --lateWash:rgba(224,154,154,0.06); --shadow:0 12px 40px rgba(0,0,0,0.45);
+    --toastBg:#E6ECE7; --toastInk:#141A16;
+  }
+  .seg{display:inline-flex; gap:2px; background:var(--pool); border:1px solid var(--poolBorder); border-radius:999px; padding:3px;}
+  .seg button{font-size:12.5px; color:var(--sub); background:transparent; border:none; border-radius:999px; padding:4px 12px;}
+  .seg button.on{background:var(--accent); color:#fff; font-weight:500;}
+  .srow{display:flex; align-items:center; justify-content:space-between; gap:14px; padding:10px 0; border-bottom:1px solid var(--line);}
+  .srow:last-child{border-bottom:none;}
+  .srow .lab{font-size:14px; color:var(--ink);}
+  .srow .sub{font-size:12px; color:var(--sub); margin-top:1px;}
+  .switch{position:relative; width:40px; height:22px; border-radius:999px; border:none; background:var(--poolBorder); flex-shrink:0; padding:0; transition:background 120ms ease;}
+  .switch.on{background:var(--accent);}
+  .switch::after{content:""; position:absolute; top:2px; left:2px; width:18px; height:18px; border-radius:50%; background:#fff; transition:transform 120ms ease;}
+  .switch.on::after{transform:translateX(18px);}
   *{box-sizing:border-box;}
   html,body{margin:0;}
   body{
@@ -155,7 +174,7 @@ const html = htm.bind(h);
 // library, and the WebLLM engine under vendor/. The only outside request is
 // the one-time download of a model's weights when you pick one.
 // ======================================================================
-const APP_VERSION = "0.8.0";
+const APP_VERSION = "0.9.0";
 // Same database and keys as earlier hana-local versions, so an upgrade keeps
 // every task and setting in place.
 const DB_NAME = "hana-local";
@@ -524,7 +543,9 @@ async function loadWebLLM() {
 function App() {
   const [tasks, setTasks] = useState([]);
   const [loaded, setLoaded] = useState(false);
-  const [settings, setSettings] = useState({ modelId: "", cleanupOnSwitch: true, welcomeSeen: false, voiceOk: false });
+  const [settings, setSettings] = useState({ modelId: "", cleanupOnSwitch: true, welcomeSeen: false, voiceOk: false, theme: "system", pauDays: 0, pauShow: 30, unsureChecked: false, autoLoadModel: true });
+  const [showAllPau, setShowAllPau] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
   const [paste, setPaste] = useState("");
   const [busy, setBusy] = useState(false);
   const [busySince, setBusySince] = useState(0);
@@ -555,6 +576,7 @@ function App() {
   const applyBtnRef = useRef(null);
   const toastTimer = useRef(null);
   const engineRef = useRef(null);
+  const readyRef = useRef("");
   const appCfgRef = useRef(null);
   const [localShipped, setLocalShipped] = useState(false);
   const reqRef = useRef(0);
@@ -579,6 +601,35 @@ function App() {
     setSettings((prev) => { const v = { ...prev, ...patch }; idbSet(SETTINGS_KEY, v).catch(() => {}); return v; });
   };
 
+  // theme: system follows the OS, light and dark force it
+  useEffect(() => {
+    const t = settings.theme === "light" || settings.theme === "dark" ? settings.theme : "";
+    if (t) document.documentElement.setAttribute("data-theme", t); else document.documentElement.removeAttribute("data-theme");
+  }, [settings.theme]);
+
+  // the cursor lands in the paste box whenever the task view is showing
+  // (not on phones, where that would pop the keyboard up uninvited)
+  useEffect(() => {
+    if (loaded && !showSplash && !panel && !isMobile() && areaRef.current) areaRef.current.focus({ preventScroll: true });
+  }, [loaded, showSplash, panel]);
+
+  // Done tasks older than the chosen number of days leave on their own.
+  // Returns the trimmed list; 0 means keep everything.
+  const trimPau = (list, days) => {
+    if (!days) return list;
+    const cutoff = Date.now() - days * 86400000;
+    return list.filter((tk) => !tk.done || !tk.completedAt || new Date(tk.completedAt).getTime() > cutoff);
+  };
+  const applyPauDays = (days) => {
+    saveSettings({ pauDays: days });
+    mutate((prev) => {
+      const next = trimPau(prev, days);
+      const n = prev.length - next.length;
+      if (n > 0) { lastDeleted.current = { items: prev.filter((tk) => !next.includes(tk)) }; setTimeout(() => say(`Cleared ${n} old done task${n === 1 ? "" : "s"}`, undoDelete, "Undo"), 0); }
+      return next;
+    });
+  };
+
   useEffect(() => {
     if ("serviceWorker" in navigator) navigator.serviceWorker.register("./sw.js").catch(() => {});
     if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
@@ -588,7 +639,11 @@ function App() {
       let st = null;
       try { st = await idbGet(SETTINGS_KEY); } catch (e) {}
       const t = todayStr();
-      setTasks(list.map((tk) => (isDateStr(tk.due) ? tk : { ...tk, due: t })));
+      let fixed = list.map((tk) => (isDateStr(tk.due) ? tk : { ...tk, due: t }));
+      const days = st && typeof st.pauDays === "number" ? st.pauDays : 0;
+      const trimmed = trimPau(fixed, days);
+      if (trimmed.length !== fixed.length) { persist(trimmed); setTimeout(() => say(`Cleared ${fixed.length - trimmed.length} old done task${fixed.length - trimmed.length === 1 ? "" : "s"}`), 400); fixed = trimmed; }
+      setTasks(fixed);
       if (st && typeof st === "object") setSettings((p) => ({ ...p, ...st }));
       setLoaded(true);
       if (!st || !st.welcomeSeen) setShowSplash(true);
@@ -606,7 +661,7 @@ function App() {
         const suggestedTier = isMobile() ? "light" : "laptop";
         const first = (tr.find((x) => x.key === suggestedTier) || tr[0] || { models: [] }).models[0] || tr.flatMap((x) => x.models)[0];
         setChoice(saved || (shipped ? LOCAL_MODEL_ID : first ? first.model_id : ""));
-        if (saved) loadModel(saved, w);
+        if (saved && !(st && st.autoLoadModel === false)) loadModel(saved, w);
       } catch (e) {
         setEngineState({ status: "error", modelId: "", pct: 0, text: "", error: "Could not load the WebLLM engine. Check your connection for the first run." });
       }
@@ -616,7 +671,7 @@ function App() {
   // ----- model loading -----
   const loadModel = async (modelId, wPre) => {
     const w = wPre || await loadWebLLM();
-    if (!navigator.gpu) { setGpuOk(false); setEngineState({ status: "error", modelId, pct: 0, text: "", error: "This browser has no WebGPU. Use Chrome or Edge on a laptop or desktop, or Safari on a recent Mac." }); return; }
+    if (!navigator.gpu) { setGpuOk(false); setEngineState({ status: "error", modelId, pct: 0, text: "", error: "This browser has no WebGPU. Use Chrome or Edge on a laptop or desktop, or Safari on a recent Mac." }); return false; }
     const prev = engineState.modelId;
     setEngineState({ status: "loading", modelId, pct: 0, text: "Starting", error: "" });
     try {
@@ -628,6 +683,7 @@ function App() {
         engineRef.current.setInitProgressCallback((r) => setEngineState((s) => ({ ...s, status: "loading", pct: Math.round((r.progress || 0) * 100), text: r.text || "" })));
       }
       await engineRef.current.reload(modelId);
+      readyRef.current = modelId;
       setEngineState({ status: "ready", modelId, pct: 100, text: "", error: "" });
       saveSettings({ modelId });
       say(`${friendlyName(modelId)} is ready`);
@@ -635,10 +691,13 @@ function App() {
         try { await w.deleteModelAllInfoInCache(prev, cfg); say(`Removed ${friendlyName(prev)} to free space`); } catch (e) {}
         refreshStorage(w);
       }
+      return true;
     } catch (e) {
+      readyRef.current = "";
       const msg = String(e && e.message ? e.message : e);
       const oom = /memory|OOM|buffer|limit|allocation/i.test(msg);
       setEngineState({ status: "error", modelId, pct: 0, text: "", error: oom ? "That model did not fit in this device's memory. Try a smaller tier." : "Could not load the model. " + msg.slice(0, 160) });
+      return false;
     }
   };
 
@@ -695,7 +754,14 @@ function App() {
   const extract = async () => {
     const text = paste.trim();
     if (!text || busy) return;
-    if (engineState.status !== "ready" || !engineRef.current) { setPanel("model"); say("Pick and load a model first, or use Add as is"); return; }
+    if (!readyRef.current || !engineRef.current) {
+      const want = settings.modelId && catalog.some((m) => m.model_id === settings.modelId) ? settings.modelId : "";
+      if (!want) { setPanel("model"); say("Pick and load a model first, or use Add as is"); return; }
+      setBusy(true); setBusySince(Date.now());
+      const ok = await loadModel(want);
+      setBusy(false);
+      if (!ok) { setPanel("model"); return; }
+    }
     setBusy(true); setBusySince(Date.now()); setErr(""); setReview(null); setShowSkipped(false);
     const myReq = ++reqRef.current;
     const t = todayStr();
@@ -713,6 +779,7 @@ function App() {
       if (s === -1 || e === -1) throw new Error("no json");
       const parsed = JSON.parse(raw.slice(s, e + 1));
       const result = postProcess(parsed.items, open, t);
+      if (settings.unsureChecked) result.news = result.news.map((n) => ({ ...n, checked: true }));
       setReview(result);
       if (result.news.length || result.updates.length) setTimeout(() => applyBtnRef.current && applyBtnRef.current.focus({ preventScroll: true }), 0);
     } catch (e2) {
@@ -789,6 +856,11 @@ function App() {
   const clearPau = () => {
     mutate((prev) => { lastDeleted.current = { items: prev.filter((tk) => tk.done) }; return prev.filter((tk) => !tk.done); });
     say("Cleared pau", undoDelete, "Undo"); setShowPau(false);
+  };
+  const clearEverything = () => {
+    mutate((prev) => { lastDeleted.current = { items: prev }; return []; });
+    setConfirmClear(false);
+    say("Cleared every task", undoDelete, "Undo");
   };
 
   // ----- export / import (same file format as hana, so they interchange) -----
@@ -884,6 +956,7 @@ function App() {
       if (mod && e.shiftKey && e.key === "Enter") { e.preventDefault(); addAsIs(); return; }
       if (mod && e.shiftKey && (e.key === "m" || e.key === "M")) { e.preventDefault(); toggleDictation(); return; }
       if (mod && (e.key === "k" || e.key === "K")) { e.preventDefault(); setPanel(panel === "model" ? null : "model"); return; }
+      if (mod && e.key === ",") { e.preventDefault(); setPanel(panel === "settings" ? null : "settings"); return; }
       if (typing || mod || e.altKey) return;
       if (e.key === "/") { e.preventDefault(); setPanel(null); areaRef.current && areaRef.current.focus(); return; }
       if (e.key === "1") { setTab("active"); return; }
@@ -1014,10 +1087,70 @@ function App() {
       </div>`;
   };
 
+  const Switch = ({ on, onChange, label }) => html`<button class=${"switch" + (on ? " on" : "")} role="switch" aria-checked=${on} aria-label=${label} onClick=${() => onChange(!on)}></button>`;
+  const SettingsPanel = () => html`
+    <div class="card">
+      <div class="serif" style="font-size:21px; margin-bottom:6px;">Settings</div>
+      <p class="para small">Saved on this device, with your tasks. Nothing here is sent anywhere.</p>
+
+      <div class="eyebrow">Appearance</div>
+      <div class="srow">
+        <div><div class="lab">Theme</div><div class="sub">System follows your computer. Light and dark force it.</div></div>
+        <div class="seg" role="radiogroup" aria-label="Theme">
+          ${["system", "light", "dark"].map((k) => html`<button key=${k} class=${settings.theme === k ? "on" : ""} role="radio" aria-checked=${settings.theme === k} onClick=${() => saveSettings({ theme: k })}>${k}</button>`)}
+        </div>
+      </div>
+
+      <div class="eyebrow">Voice</div>
+      <div class="srow">
+        <div><div class="lab">Mic button</div><div class="sub">Uses your browser's dictation. On Chrome and Edge that audio goes to Google or Microsoft, so it is not fully local. <button class="linkbtn" style="font-size:12px;" onClick=${() => setPanel("privacy")}>More on the privacy page.</button></div></div>
+        <${Switch} on=${!!settings.voiceOk} onChange=${(v) => saveSettings({ voiceOk: v })} label="Mic button" />
+      </div>
+
+      <div class="eyebrow">Done tasks</div>
+      <div class="srow">
+        <div><div class="lab">Clear done tasks after</div><div class="sub">Finished tasks older than this leave Pau on their own, with an Undo the moment it happens.</div></div>
+        <select class="field" value=${String(settings.pauDays || 0)} onChange=${(e) => applyPauDays(parseInt(e.target.value, 10) || 0)} aria-label="Clear done tasks after">
+          <option value="0">never</option><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option>
+        </select>
+      </div>
+      <div class="srow">
+        <div><div class="lab">Show in Pau</div><div class="sub">How many finished tasks to list when Pau is open. The rest sit behind a show-all link.</div></div>
+        <select class="field" value=${String(settings.pauShow === 0 ? 0 : settings.pauShow || 30)} onChange=${(e) => saveSettings({ pauShow: parseInt(e.target.value, 10) || 0 })} aria-label="Show in Pau">
+          <option value="10">last 10</option><option value="30">last 30</option><option value="100">last 100</option><option value="0">all</option>
+        </select>
+      </div>
+
+      <div class="eyebrow">Reading</div>
+      <div class="srow">
+        <div><div class="lab">Unsure items start checked</div><div class="sub">By default an item the model was unsure about waits unchecked in the review. Turn this on to check everything and uncheck what you don't want.</div></div>
+        <${Switch} on=${!!settings.unsureChecked} onChange=${(v) => saveSettings({ unsureChecked: v })} label="Unsure items start checked" />
+      </div>
+      <div class="srow">
+        <div><div class="lab">Load the model when hana opens</div><div class="sub">On is fastest. Off saves memory and battery until you press Extract tasks, which then loads it first.</div></div>
+        <${Switch} on=${settings.autoLoadModel !== false} onChange=${(v) => saveSettings({ autoLoadModel: v })} label="Load the model when hana opens" />
+      </div>
+      <div class="srow">
+        <div><div class="lab">Free space when switching models</div><div class="sub">Removes the previous model's download after a new one loads.</div></div>
+        <${Switch} on=${!!settings.cleanupOnSwitch} onChange=${(v) => saveSettings({ cleanupOnSwitch: v })} label="Free space when switching models" />
+      </div>
+
+      <div class="eyebrow">Your data</div>
+      <div class="row gap2 wrapflex" style="margin-top:6px;">
+        <button class="ghost" onClick=${exportData}>Export tasks</button>
+        <button class="ghost" onClick=${() => fileRef.current && fileRef.current.click()}>Import tasks</button>
+        ${confirmClear ? html`
+          <button class="ghost danger" onClick=${clearEverything}>Yes, clear every task</button>
+          <button class="ghost" onClick=${() => setConfirmClear(false)}>Keep them</button>
+        ` : html`<button class="ghost danger" onClick=${() => setConfirmClear(true)} disabled=${!tasks.length}>Clear all tasks</button>`}
+      </div>
+      <p class="para small" style="margin-top:8px;">Clear all removes every task, open and done, with an Undo for a few seconds. Export first if you want a copy. Models are managed on the model page and are never touched by this.</p>
+    </div>`;
+
   const HelpPanel = () => html`
     <div class="card">
       <div class="serif" style="font-size:21px; margin-bottom:10px;">How hana local works</div>
-      <p class="para">hana turns whatever you paste into a clean task list. Drop in a full email, meeting notes, or a single line like "call the vet Friday" and press Make tasks. A small model running on your own device reads it. Nothing is sent anywhere.</p>
+      <p class="para">hana turns whatever you paste into a clean task list. Drop in a full email, meeting notes, or a single line like "call the vet Friday" and press Extract tasks. A small model running on your own device reads it. Nothing is sent anywhere.</p>
       <div class="eyebrow">Adding tasks</div>
       <p class="para">The model labels every line it finds, then hana keeps only real tasks that are yours. It skips things other people said they would do, newsletters, and plain info, and shows them in a Skipped list so you can rescue any with one tap. Dates like "by Thursday" or "week of the 20th" are worked out by hana itself, not the model, so they land on the right day.</p>
       <div class="eyebrow">Reviewing what it found</div>
@@ -1028,13 +1161,16 @@ function App() {
       <p class="para">Active is what you are working on now or soon. The Holding Tank is a backlog for someday, on hold, or waiting-on things. Both keep whatever dates you set, and nothing moves on its own. Anything past its date gathers under Late at the top.</p>
       <div class="eyebrow">Everyday use</div>
       <p class="para">Tap the circle to finish a task. Finished tasks rest in Pau at the bottom of Active. Tap a title to reword it, tap + project to group it, and use the project chips to filter. Deleting shows an Undo for a few seconds.</p>
+      <div class="eyebrow">Settings</div>
+      <p class="para">The settings page has the theme, the mic switch, how long finished tasks stay in Pau, how many Pau shows, whether unsure items start checked, whether the model loads when hana opens, and the free-space-on-switch option. Press ⌘, to get there.</p>
       <div class="eyebrow">Keyboard</div>
       <div class="shortcuts">
-        <span><span class="kbd">⌘</span> <span class="kbd">↵</span></span><span>Make tasks, or accept the review when it is open</span>
+        <span><span class="kbd">⌘</span> <span class="kbd">↵</span></span><span>Extract tasks, or accept the review when it is open</span>
         <span><span class="kbd">↵</span></span><span>Accept everything in the review</span>
         <span><span class="kbd">⌘</span> <span class="kbd">⇧</span> <span class="kbd">↵</span></span><span>Add as is, no model</span>
         <span><span class="kbd">⌘</span> <span class="kbd">⇧</span> <span class="kbd">M</span></span><span>Start or stop voice</span>
         <span><span class="kbd">⌘</span> <span class="kbd">K</span></span><span>Model and storage</span>
+        <span><span class="kbd">⌘</span> <span class="kbd">,</span></span><span>Settings</span>
         <span><span class="kbd">/</span></span><span>Jump to the paste box</span>
         <span><span class="kbd">1</span> <span class="kbd">2</span></span><span>Active, Holding Tank</span>
         <span><span class="kbd">?</span></span><span>This help</span>
@@ -1141,6 +1277,7 @@ function App() {
           <h1 class="serif">hana <span class="mono" style="font-style:normal; font-weight:400; font-size:12px; color:var(--sub); letter-spacing:0; margin-left:4px;">local</span></h1>
           <div class="links">
             <button class=${panel === "model" ? "on" : ""} onClick=${() => setPanel(panel === "model" ? null : "model")}>${panel === "model" ? "back to tasks" : "model"}</button>
+            <button class=${panel === "settings" ? "on" : ""} onClick=${() => setPanel(panel === "settings" ? null : "settings")}>${panel === "settings" ? "back to tasks" : "settings"}</button>
             <button class=${panel === "privacy" ? "on" : ""} onClick=${() => setPanel(panel === "privacy" ? null : "privacy")}>${panel === "privacy" ? "back to tasks" : "privacy"}</button>
             <button class=${panel === "help" ? "on" : ""} onClick=${() => setPanel(panel === "help" ? null : "help")}>${panel === "help" ? "back to tasks" : "help"}</button>
             <span>${loaded ? `${openCount} open` : "loading"}</span>
@@ -1148,6 +1285,7 @@ function App() {
         </div>
 
         ${panel === "model" && html`<${ModelPanel} />`}
+        ${panel === "settings" && html`<${SettingsPanel} />`}
         ${panel === "help" && html`<${HelpPanel} />`}
         ${panel === "privacy" && html`<${PrivacyPanel} />`}
 
@@ -1162,15 +1300,15 @@ function App() {
                 ${speechSupport && html`<button class=${"mic" + (listening ? " on" : "")} onClick=${toggleDictation} aria-pressed=${listening} aria-label=${listening ? "Stop voice" : "Start voice"} title=${listening ? "Stop (⌘⇧M)" : "Speak (⌘⇧M)"}>
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor" /><path d="M5 11a7 7 0 0 0 14 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /><path d="M12 18v3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" /></svg>
                 </button>`}
-                <span class="hint">${listening ? "listening… esc to stop" : "⌘↵ make · ⌘⇧↵ add as is"}</span>
+                <span class="hint">${listening ? "listening… esc to stop" : "⌘↵ extract · ⌘⇧↵ add as is"}</span>
               </div>
               <div class="row gap2">
                 ${busy ? html`<button class="ghost" onClick=${cancelExtract}>Stop</button>` : html`<button class="ghost" disabled=${!paste.trim()} onClick=${addAsIs} title="Skip the model, one task per line (⌘⇧↵)">Add as is</button>`}
-                <button class="primary" disabled=${!paste.trim() || busy} onClick=${extract}>${busy ? `Reading… ${busySecs}s` : "Make tasks"}</button>
+                <button class="primary" disabled=${!paste.trim() || busy} onClick=${extract}>${busy ? `Reading… ${busySecs}s` : "Extract tasks"}</button>
               </div>
             </div>
             ${busy && busySecs >= 8 ? html`<div class="notice">Taking a while. You can keep waiting, press Stop, or use Add as is to add the text straight in without the model.</div>` : null}
-            ${!busy && engineState.status !== "ready" && paste.trim() ? html`<div class="small" style="margin-top:8px;">No model loaded yet. <button class="linkbtn" onClick=${() => setPanel("model")}>Pick one</button> or use Add as is.</div>` : null}
+            ${!busy && engineState.status !== "ready" && paste.trim() ? html`<div class="small" style="margin-top:8px;">${settings.modelId && settings.autoLoadModel === false ? html`The model loads when you press Extract tasks.` : html`No model loaded yet. <button class="linkbtn" onClick=${() => setPanel("model")}>Pick one</button> or use Add as is.`}</div>` : null}
           </div>
 
           ${err && html`<div class="alert row between gap3 wrapflex"><span>${err}</span><button class="ghost danger" style="padding:3px 10px; font-size:12.5px;" onClick=${addAsIs}>Add as is</button></div>`}
@@ -1200,7 +1338,13 @@ function App() {
                 <button onClick=${() => setShowPau((s) => !s)} style="font-size:11px; letter-spacing:0.09em; text-transform:uppercase; color:var(--done); background:none; border:none; padding:0;">${showPau ? "▾" : "▸"} Pau · ${pau.length}</button>
                 ${showPau && html`<button class="linkbtn" style="font-size:12px; color:var(--sub);" onClick=${clearPau}>Clear all</button>`}
               </div>
-              ${showPau && pau.map((t) => html`<${Row} key=${t.id} t=${t} />`)}
+              ${showPau && (() => {
+                const lim = settings.pauShow === 0 ? 0 : settings.pauShow || 30;
+                const shown = lim && !showAllPau ? pau.slice(0, lim) : pau;
+                return html`
+                  ${shown.map((t) => html`<${Row} key=${t.id} t=${t} />`)}
+                  ${lim && pau.length > lim ? html`<div class="center" style="margin-top:10px;"><button class="linkbtn" style="font-size:12.5px; color:var(--sub);" onClick=${() => setShowAllPau((s) => !s)}>${showAllPau ? `show last ${lim}` : `show all ${pau.length}`}</button></div>` : null}`;
+              })()}
             </div>`}
         `}
 
@@ -1217,7 +1361,7 @@ function App() {
             <div class="serif" style="font-size:26px; margin-bottom:4px;">aloha, this is hana local</div>
             <p style="margin:0; color:var(--sub);">A task manager you can paste anything into. It runs entirely on your device.</p>
             <div class="eyebrow">Paste, review, done</div>
-            <p class="para">Drop in an email, meeting notes, or one line like "call the vet Friday" and press Make tasks. A small model on your device pulls out the real tasks and shows them for a quick review before anything is added. Add as is skips the model entirely.</p>
+            <p class="para">Drop in an email, meeting notes, or one line like "call the vet Friday" and press Extract tasks. A small model on your device pulls out the real tasks and shows them for a quick review before anything is added. Add as is skips the model entirely.</p>
             <div class="eyebrow">Your words never leave this device</div>
             <p class="para">No server, no account, no tracking. The model runs in your browser and your tasks are stored in your browser. The only download is the model itself, once. After that, airplane mode works.</p>
             <div class="eyebrow">Dates stay put</div>
